@@ -44,7 +44,7 @@ const inputSchema = {
 
 type Args = z.infer<z.ZodObject<typeof inputSchema>>;
 
-const pointSchema = z.object({
+const pointSchema = z.looseObject({
   date: z.string(),
   organicTraffic: z.number().nullable(),
   organicKeywords: z.number().nullable(),
@@ -65,7 +65,7 @@ export const getDomainHistoryTool = {
         languageCode: z.string(),
         estimatedMaxCostUsd: z.number(),
         series: z.array(
-          z.object({
+          z.looseObject({
             domain: z.string(),
             points: z.array(pointSchema),
             fetchedAt: z.string(),
