@@ -32,7 +32,9 @@ export const GSC_DATE_RANGES = [
   "last_16_months",
 ] as const;
 
-export const GSC_DEFAULT_ROW_LIMIT = 1000;
+// 250 rows fits comfortably inside one MCP tool result; the agent opts into
+// more with `rowLimit` or paginates with `startRow`.
+export const GSC_DEFAULT_ROW_LIMIT = 250;
 // v1 caps rows-per-call at 1000 to protect the MCP context window. The GSC API
 // supports up to 25000, but we keep fetched == returned so counts stay honest;
 // the agent paginates with `startRow` for more.
@@ -85,14 +87,15 @@ function subtractUtcMonths(date: Date, months: number): Date {
   return d;
 }
 
+// GSC treats both startDate and endDate as inclusive, so an N-day window starts N-1 days before the end.
 function subtractRange(end: Date, range: GscDateRange): Date {
   const d = new Date(end);
   switch (range) {
     case "last_7_days":
-      d.setUTCDate(d.getUTCDate() - 7);
+      d.setUTCDate(d.getUTCDate() - 6);
       break;
     case "last_28_days":
-      d.setUTCDate(d.getUTCDate() - 28);
+      d.setUTCDate(d.getUTCDate() - 27);
       break;
     case "last_3_months":
       return subtractUtcMonths(d, 3);

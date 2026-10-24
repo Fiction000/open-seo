@@ -5,7 +5,6 @@ import { resolveExistingActiveHostedOrganization } from "@/server/auth/default-h
 import { AuthRepository } from "@/server/auth/repositories/AuthRepository";
 import { recordMcpAuthorized } from "@/server/features/activation/mcpActivation";
 import { createWorkersOAuthMcpProps, MCP_ROUTE } from "@/server/mcp/context";
-import { handleAuthenticatedOpenSeoMcpRequest } from "@/server/mcp/transport";
 
 function getApiKey(request: Request) {
   // Both branches require the oseo_ prefix: anything else (a Cloudflare OAuth
@@ -103,14 +102,14 @@ export async function handleMcpApiKeyRequest(
 
     const userId = result.key.referenceId;
 
-    // Per-user request throttle. The binding is declared in alchemy.run.ts
+    // Per-user request throttle. The binding is declared in deploy/alchemy/alchemy.run.ts
     // (hosted prod only); local dev and self-host run without it and skip
     // limiting, which is fine single-user. This replaces the better-auth
     // plugin limiter, whose broken idle-gap window hard-blocked active MCP
     // clients (see lib/auth-api-key.ts). Cloudflare's counter is per-colo
     // best-effort, which is all this needs to be: credits bound spend, this
     // bounds runaway request volume.
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the binding is declared as a rate limiter in alchemy.run.ts; absent outside hosted prod
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the binding is declared as a rate limiter in deploy/alchemy/alchemy.run.ts; absent outside hosted prod
     const rateLimit = (env as { MCP_RATE_LIMIT?: RateLimit }).MCP_RATE_LIMIT;
     if (rateLimit) {
       const { success } = await rateLimit.limit({ key: userId });
@@ -141,16 +140,14 @@ export async function handleMcpApiKeyRequest(
 
     // clientId "api_key" satisfies the hosted transport's fail-closed props
     // schema and counts these calls as external MCP clients in telemetry.
-    // orgScope "user": the key itself is the credential, not a key→org
-    // binding — project-scoped tools authorize per call via the caller's
-    // membership in the project's org, and organizationId above is only the
-    // fallback for tools with no project argument.
+    // The key is the credential, not a key→org binding: the hosted transport
+    // stamps orgScope "user", and organizationId above is only the fallback
+    // for tools with no project argument.
     const props = createWorkersOAuthMcpProps({
       userId,
       userEmail: user.email,
       organizationId,
       role,
-      orgScope: "user",
       baseUrl: getHostedBaseUrl(),
       scopes: [...MCP_OAUTH_SCOPES],
       clientId: "api_key",
@@ -158,6 +155,8 @@ export async function handleMcpApiKeyRequest(
 
     await recordMcpAuthorized(organizationId);
 
+    const { handleAuthenticatedOpenSeoMcpRequest } =
+      await import("@/server/mcp/transport");
     return await handleAuthenticatedOpenSeoMcpRequest(request, props, env, ctx);
   } catch (error) {
     // Without this, a throw here surfaces as a bare platform 500 with no log

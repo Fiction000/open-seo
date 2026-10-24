@@ -9,6 +9,12 @@ import type { WorkflowStepConfig } from "cloudflare:workers";
  * step now has a timeout sized to its real work and a small retry budget.
  */
 
+/** Redirect probe of the start URL: up to 5 hops at 10s each. */
+export const START_URL_STEP: WorkflowStepConfig = {
+  retries: { limit: 2, delay: "5 seconds", backoff: "exponential" },
+  timeout: "2 minutes",
+};
+
 /** Robots + sitemap walk (bounded at 300 docs / 15s per fetch internally). */
 export const DISCOVERY_STEP: WorkflowStepConfig = {
   retries: { limit: 2, delay: "5 seconds", backoff: "exponential" },
@@ -28,6 +34,15 @@ export const CRAWL_CHUNK_STEP: WorkflowStepConfig = {
 export const LIGHTHOUSE_FETCH_STEP: WorkflowStepConfig = {
   retries: { limit: 0, delay: "1 second" },
   timeout: "5 minutes",
+};
+
+/**
+ * Confirms a rendered audit's credit lock. Finalizing a lock twice is refused,
+ * so a replay must not run it again; a failed settlement expires on its own.
+ */
+export const SETTLE_RENDERING_STEP: WorkflowStepConfig = {
+  retries: { limit: 0, delay: "1 second" },
+  timeout: "1 minute",
 };
 
 /** R2 + DB persistence is idempotent and safe to retry after the paid step. */

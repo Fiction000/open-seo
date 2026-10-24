@@ -31,6 +31,14 @@ const META_DESCRIPTION_MIN_CHARS = 70;
 const THIN_CONTENT_WORDS = 150;
 const SLOW_RESPONSE_MS = 1500;
 const DEEP_PAGE_DEPTH = 5;
+// Meta tags are uncapped in the HTML, so bound the copy stored on each issue.
+const MAX_FLAGGED_TEXT_CHARS = 100;
+
+function truncateFlaggedText(text: string): string {
+  return text.length > MAX_FLAGGED_TEXT_CHARS
+    ? `${text.slice(0, MAX_FLAGGED_TEXT_CHARS)}…`
+    : text;
+}
 
 function hasHeadingLevelSkip(headingOrder: number[]): boolean {
   for (let i = 1; i < headingOrder.length; i++) {
@@ -48,6 +56,10 @@ export function runPageReporters(page: CrawledPageResult): DetectedIssue[] {
 
   if (page.fetchClass === "blocked") {
     report("blocked-page", { statusCode: page.statusCode });
+    return issues;
+  }
+  if (page.fetchClass === "rate_limited") {
+    report("rate-limited-page", { statusCode: page.statusCode });
     return issues;
   }
   if (page.fetchClass === "error") {
@@ -72,41 +84,9 @@ export function runPageReporters(page: CrawledPageResult): DetectedIssue[] {
   }
 
   // Content checks only make sense for analyzed HTML documents (a PDF has no
-  // title tag to miss; an empty-shell HTML page very much does).
+  // title tag to miss).
   if (!page.isHtml) {
     return issues;
-  }
-
-  // Titles
-  if (!page.title) {
-    report("missing-title");
-  } else if (page.title.length > TITLE_MAX_CHARS) {
-    report("title-too-long", { length: page.title.length });
-  } else if (page.title.length < TITLE_MIN_CHARS) {
-    report("title-too-short", { length: page.title.length });
-  }
-
-  // Meta description
-  if (!page.metaDescription) {
-    report("missing-meta-description");
-  } else if (page.metaDescription.length > META_DESCRIPTION_MAX_CHARS) {
-    report("meta-description-too-long", {
-      length: page.metaDescription.length,
-    });
-  } else if (page.metaDescription.length < META_DESCRIPTION_MIN_CHARS) {
-    report("meta-description-too-short", {
-      length: page.metaDescription.length,
-    });
-  }
-
-  // Headings
-  if (page.h1Count === 0) {
-    report("missing-h1");
-  } else if (page.h1Count > 1) {
-    report("multiple-h1", { h1Count: page.h1Count });
-  }
-  if (hasHeadingLevelSkip(page.headingOrder)) {
-    report("heading-order-skip");
   }
 
   // Indexability + canonical signals
@@ -131,6 +111,61 @@ export function runPageReporters(page: CrawledPageResult): DetectedIssue[] {
     report("canonicalized-page", { canonicalUrl: effectiveCanonical });
   }
 
+  if (page.crawlDepth !== null && page.crawlDepth >= DEEP_PAGE_DEPTH) {
+    report("deep-page", { crawlDepth: page.crawlDepth });
+  }
+
+  // The initial app shell cannot establish what the rendered page is missing.
+  // Report the coverage gap instead of thin-content/missing-heading claims.
+  if (page.javascriptShell) {
+    report("javascript-rendering-suspected", { wordCount: page.wordCount });
+    return issues;
+  }
+
+  // Titles
+  if (!page.title) {
+    report("missing-title");
+  } else if (page.title.length > TITLE_MAX_CHARS) {
+    report("title-too-long", {
+      length: page.title.length,
+      max: TITLE_MAX_CHARS,
+      title: truncateFlaggedText(page.title),
+    });
+  } else if (page.title.length < TITLE_MIN_CHARS) {
+    report("title-too-short", {
+      length: page.title.length,
+      min: TITLE_MIN_CHARS,
+      title: page.title,
+    });
+  }
+
+  // Meta description
+  if (!page.metaDescription) {
+    report("missing-meta-description");
+  } else if (page.metaDescription.length > META_DESCRIPTION_MAX_CHARS) {
+    report("meta-description-too-long", {
+      length: page.metaDescription.length,
+      max: META_DESCRIPTION_MAX_CHARS,
+      description: truncateFlaggedText(page.metaDescription),
+    });
+  } else if (page.metaDescription.length < META_DESCRIPTION_MIN_CHARS) {
+    report("meta-description-too-short", {
+      length: page.metaDescription.length,
+      min: META_DESCRIPTION_MIN_CHARS,
+      description: page.metaDescription,
+    });
+  }
+
+  // Headings
+  if (page.h1Count === 0) {
+    report("missing-h1");
+  } else if (page.h1Count > 1) {
+    report("multiple-h1", { h1Count: page.h1Count });
+  }
+  if (hasHeadingLevelSkip(page.headingOrder)) {
+    report("heading-order-skip");
+  }
+
   // Content quality
   if (page.isIndexable && page.wordCount < THIN_CONTENT_WORDS) {
     report("thin-content", { wordCount: page.wordCount });
@@ -145,9 +180,6 @@ export function runPageReporters(page: CrawledPageResult): DetectedIssue[] {
   // Structure
   if (page.isIndexable && page.links.length === 0) {
     report("no-outgoing-links");
-  }
-  if (page.crawlDepth !== null && page.crawlDepth >= DEEP_PAGE_DEPTH) {
-    report("deep-page", { crawlDepth: page.crawlDepth });
   }
 
   return issues;

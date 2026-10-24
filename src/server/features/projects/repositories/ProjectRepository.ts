@@ -44,10 +44,31 @@ async function getProjectForOrganization(
   return project ?? null;
 }
 
+// The archived counterpart of getProjectForOrganization, for the surfaces that
+// owe the reader "this project is archived" instead of a bare not-found. Still
+// org-scoped, so it adds no cross-org existence oracle.
+async function getArchivedProjectForOrganization(
+  projectId: string,
+  organizationId: string,
+) {
+  const [project] = await db
+    .select()
+    .from(projects)
+    .where(
+      and(
+        eq(projects.id, projectId),
+        eq(projects.organizationId, organizationId),
+        isNotNull(projects.archivedAt),
+      ),
+    )
+    .limit(1);
+  return project ?? null;
+}
+
 // Look up a project by id alone (no org scoping). Only for trusted server
 // contexts that have already authorized access another way — e.g. the
-// onboarding chat Durable Object, whose connections are authorized in the
-// Worker before they reach the DO, and which derives its org from the project.
+// SAM chat Durable Object, whose connections are authorized in the Worker
+// before they reach the DO, and which derives its org from the project.
 async function getProjectById(projectId: string) {
   const [project] = await db
     .select()
@@ -101,15 +122,16 @@ async function updateProject(
   return row;
 }
 
-// Writes only the domain column, for the dashboard's inline domain input.
-async function updateProjectDomain(
+// Save website setup atomically without rewriting the project name.
+async function updateProjectWebsite(
   projectId: string,
   organizationId: string,
   domain: string,
+  market: { locationCode: number; languageCode: string },
 ) {
   const [row] = await db
     .update(projects)
-    .set({ domain })
+    .set({ domain, ...market })
     .where(
       and(
         eq(projects.id, projectId),
@@ -126,31 +148,23 @@ async function updateProjectDomain(
   return row;
 }
 
-// Writes only the market columns. Onboarding sets the project's market before
-// the user has named the project or picked a domain, so it must not go through
-// updateProject, whose `domain: input.domain ?? null` would clear the domain.
-async function updateProjectMarket(
+// Saves the key only if the project has none, so concurrent first uses can't
+// leave the site's key file pointing at a key that was overwritten.
+async function setIndexNowKeyIfMissing(
   projectId: string,
   organizationId: string,
-  market: { locationCode: number; languageCode: string },
+  key: string,
 ) {
-  const [row] = await db
+  await db
     .update(projects)
-    .set(market)
+    .set({ indexnowKey: key })
     .where(
       and(
         eq(projects.id, projectId),
         eq(projects.organizationId, organizationId),
-        isNull(projects.archivedAt),
+        isNull(projects.indexnowKey),
       ),
-    )
-    .returning();
-
-  if (!row) {
-    throw new AppError("NOT_FOUND");
-  }
-
-  return row;
+    );
 }
 
 async function tryCreateDefaultProject(organizationId: string) {
@@ -219,11 +233,12 @@ export const ProjectRepository = {
   listArchivedProjects,
   countProjects,
   getProjectForOrganization,
+  getArchivedProjectForOrganization,
   getProjectById,
   createProject,
   updateProject,
-  updateProjectDomain,
-  updateProjectMarket,
+  updateProjectWebsite,
+  setIndexNowKeyIfMissing,
   tryCreateDefaultProject,
   archiveProject,
   restoreProject,

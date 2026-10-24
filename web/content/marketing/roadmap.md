@@ -21,11 +21,9 @@ Have a feature request that belongs here? [Tell us on Discord](https://discord.g
 - Web Bot Auth for bot-protected sites for Audit
 - Improve In App Agent
 - Consistent design across OpenSEO, built on a shared component library
-- IndexNow support
 
 ## Soon
 
-- Prompt tracking for AI search visibility
 - Google Business Profile integration
 - Google Maps geo-grid rank tracking
 - Support multi-user for Docker self hosting

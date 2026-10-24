@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { betterAuth } from "better-auth";
-import { APIError } from "better-auth/api";
+import { APIError, createAuthMiddleware } from "better-auth/api";
 import { captcha } from "better-auth/plugins";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { tanstackStartCookies } from "better-auth/tanstack-start";
@@ -11,6 +11,7 @@ import { pgDb } from "@/db/pg/client";
 import * as pgSchema from "@/db/pg/schema";
 import { getDatabaseProvider } from "@/db/provider";
 import { z } from "zod";
+import { CURRENT_TERMS_VERSION } from "@/shared/terms";
 import { isHostedAuthMode } from "@/lib/auth-mode";
 import { createApiKeyPlugin } from "@/lib/auth-api-key";
 import { createBaseAuthConfig } from "@/lib/auth-config";
@@ -22,6 +23,16 @@ import { resolveSignInHostedOrganization } from "@/server/auth/default-hosted-or
 import { onInvitationAccepted } from "@/server/auth/invited-member";
 import { AuthRepository } from "@/server/auth/repositories/AuthRepository";
 import { captureDubReferralSignup } from "@/server/referrals/dub";
+import { captureMetaSignup } from "@/server/referrals/meta";
+import {
+  captureSignUpCompleted,
+  saveSignUpCampaign,
+} from "@/server/auth/sign-up-analytics";
+import {
+  productUpdatesOnByDefault,
+  requestPrivacyChoices,
+} from "@/shared/privacy-choices";
+import { markOnboardingMilestone } from "@/server/email/onboarding-drip";
 import {
   sendHostedPasswordResetEmail,
   sendHostedVerificationEmail,
@@ -38,6 +49,8 @@ const hostedBaseUrlSchema = z
       (url.protocol === "http:" && url.hostname === "localhost")
     );
   }, "BETTER_AUTH_URL must use https or localhost");
+
+const createdApiKeySchema = z.object({ referenceId: z.string() });
 
 function createAuth() {
   // Hosted needs the real configured URL (cookies, callbacks, /api/auth routes
@@ -87,8 +100,9 @@ function createAuth() {
               // plugin lets an owner grant owner to another member. Owners
               // control billing, so a second owner is a billing-escalation
               // path (and, if the first owner then leaves, a fresh-org /
-              // free-grant loop at next sign-in). Ownership transfers stay a
-              // support action — reject owner here.
+              // free-grant loop at next sign-in). Ownership moves only through
+              // the transferOwnership server function, which swaps the two
+              // roles atomically — reject owner here.
               beforeUpdateMemberRole: async ({ newRole }) => {
                 if (
                   newRole
@@ -98,7 +112,7 @@ function createAuth() {
                 ) {
                   throw new APIError("BAD_REQUEST", {
                     message:
-                      "The owner role can't be granted from here. Contact support to transfer ownership.",
+                      "The owner role can't be granted from here. Use Transfer ownership in organization settings.",
                   });
                 }
               },
@@ -184,13 +198,11 @@ function createAuth() {
           },
         },
     socialProviders: getSocialProviders(),
-    // Where OAuth redirect-flow failures land when Better Auth can't honor a
-    // per-flow errorCallbackURL (Google-side errors like a canceled consent
-    // screen, replayed callback URLs, sign-in failures). Without this the
-    // default /api/auth/error page 302s to `/?error=...` and the dashboard
-    // silently discards the code. Self-hosted never serves these flows (its
-    // Google OAuth endpoints are hand-rolled), so the placeholder baseUrl
-    // there is harmless.
+    // Where Google sign-in failures land (canceled consent screen, replayed
+    // callback URLs). Without this the default /api/auth/error page 302s to
+    // `/?error=...` and the dashboard silently discards the code. Self-hosted
+    // never serves social sign-in, so the placeholder baseUrl there is
+    // harmless.
     onAPIError: { errorURL: `${baseUrl}/auth-error` },
     trustedOrigins: getTrustedOrigins(baseUrl),
     database,
@@ -208,27 +220,76 @@ function createAuth() {
         : []),
       tanstackStartCookies(),
     ],
+    hooks: {
+      // Marked when the user creates an MCP API key, the API-key counterpart
+      // of OAuth's authorize step. Not on each /mcp request: isolates share no
+      // memory, so every one would re-send it and hit Loops' team-wide rate
+      // limit.
+      after: createAuthMiddleware(async (ctx) => {
+        if (ctx.path !== "/api-key/create") return;
+        const created = createdApiKeySchema.safeParse(ctx.context.returned);
+        if (!created.success) return;
+        const user = await AuthRepository.getHostedUser(
+          created.data.referenceId,
+        );
+        if (!user) return;
+        await markOnboardingMilestone(
+          { userId: user.id, userEmail: user.email },
+          "mcpConnected",
+        );
+      }),
+    },
     databaseHooks: {
       user: {
         create: {
           // Hosted only: keep cheap mass-signups off the free plan by rejecting
           // throwaway-inbox domains before the user row is created. Self-hosted
           // has no shared credit pool to protect, so it's left untouched.
-          before: async (user) => {
-            if (
-              isHostedAuthMode(env.AUTH_MODE) &&
-              isDisposableEmailDomain(user.email)
-            ) {
+          before: async (user, ctx) => {
+            if (!isHostedAuthMode(env.AUTH_MODE)) {
+              return { data: user };
+            }
+            if (isDisposableEmailDomain(user.email)) {
               throw new APIError("BAD_REQUEST", {
                 message: "Please sign up with a non-disposable email address.",
               });
             }
-            return { data: user };
+            // Start new accounts with the analytics choice that applies to
+            // this browser, so server-side analytics doesn't run for a
+            // visitor who hasn't opted in where opt-in is required.
+            const choices = requestPrivacyChoices(ctx?.request);
+            const now = new Date();
+            // Every hosted signup path (email form, Google on the sign-up or
+            // sign-in page) shows the Terms clickwrap next to its button.
+            return {
+              data: {
+                ...user,
+                analyticsOptedOut: !choices.analytics,
+                productUpdatesOptIn: productUpdatesOnByDefault(
+                  ctx?.request?.headers.get("cf-ipcountry"),
+                ),
+                productUpdatesChangedAt: now,
+                termsAcceptedVersion: CURRENT_TERMS_VERSION,
+                termsAcceptedAt: now,
+              },
+            };
           },
           after: async (user, ctx) => {
             await syncHostedSignupContact(user);
             if (isHostedAuthMode(env.AUTH_MODE)) {
-              await captureDubReferralSignup(user.id, ctx?.request);
+              // Partner attribution is a referral choice: an older dub_id
+              // cookie must not credit a partner without it.
+              if (requestPrivacyChoices(ctx?.request).referrals) {
+                await captureDubReferralSignup(user.id, ctx?.request);
+              }
+              // Sent only if the separate advertising (Meta) choice allows it.
+              captureMetaSignup(ctx?.request);
+              await saveSignUpCampaign(user.id, ctx).catch((error) =>
+                console.error("sign-up campaign save failed", error),
+              );
+              await captureSignUpCompleted(user, ctx).catch((error) =>
+                console.error("sign-up analytics failed", error),
+              );
             }
           },
         },
@@ -270,12 +331,14 @@ async function syncHostedSignupContact(user: {
   id: string;
   email: string;
   name?: string | null;
+  productUpdatesOptIn?: unknown;
 }) {
   try {
     await upsertHostedSignupContact({
       userId: user.id,
       email: user.email,
       name: user.name,
+      productUpdates: user.productUpdatesOptIn === true,
     });
   } catch (error) {
     console.error("Failed to sync Loops profile after user creation:", {
@@ -330,10 +393,10 @@ function getHostedSecret() {
 
 function getSocialProviders() {
   // Google social login is hosted-only. Self-hosted builds the auth instance
-  // solely for Search Console token ops, which use the genericOAuth provider
-  // (createBaseAuthConfig) with its own creds — so it must NOT require the
+  // for sessions and for the token-encryption secret that Search Console /
+  // Analytics grants use (googleOAuth.ts) — so it must NOT require the
   // social-login config here, otherwise getAuth() construction would be coupled
-  // to GSC creds rather than just BETTER_AUTH_SECRET.
+  // to Google creds rather than just BETTER_AUTH_SECRET.
   if (!isHostedAuthMode(env.AUTH_MODE)) {
     return {};
   }

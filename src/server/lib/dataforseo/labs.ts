@@ -156,6 +156,7 @@ export async function fetchRelatedKeywords(input: {
   limit: number;
   depth?: number;
   includeClickstreamData?: boolean;
+  ignoreSynonyms?: boolean;
 }): Promise<DataforseoApiResponse<RelatedKeywordItem[]>> {
   const response = await dataforseoPost<
     DataforseoItemsTask<RelatedKeywordItem>
@@ -166,8 +167,9 @@ export async function fetchRelatedKeywords(input: {
       language_code: input.languageCode,
       limit: input.limit,
       depth: input.depth ?? 3,
+      ignore_synonyms: input.ignoreSynonyms ?? false,
       // Clickstream-refined volumes DOUBLE the request cost, so they are
-      // opt-in — see specs/0004-keyword-data-source-routing.md.
+      // opt-in — see docs/maintainers/specs/0004-keyword-data-source-routing.md.
       include_clickstream_data: input.includeClickstreamData ?? false,
       include_serp_info: false,
     },
@@ -185,6 +187,7 @@ export async function fetchKeywordSuggestions(input: {
   languageCode: string;
   limit: number;
   includeClickstreamData?: boolean;
+  ignoreSynonyms?: boolean;
 }): Promise<DataforseoApiResponse<LabsKeywordDataItem[]>> {
   const response = await dataforseoPost<
     DataforseoItemsTask<LabsKeywordDataItem>
@@ -197,7 +200,7 @@ export async function fetchKeywordSuggestions(input: {
       include_clickstream_data: input.includeClickstreamData ?? false,
       include_serp_info: false,
       include_seed_keyword: true,
-      ignore_synonyms: false,
+      ignore_synonyms: input.ignoreSynonyms ?? false,
       exact_match: false,
     },
   ]);
@@ -214,6 +217,7 @@ export async function fetchKeywordIdeas(input: {
   languageCode: string;
   limit: number;
   includeClickstreamData?: boolean;
+  ignoreSynonyms?: boolean;
 }): Promise<DataforseoApiResponse<LabsKeywordDataItem[]>> {
   const response = await dataforseoPost<
     DataforseoItemsTask<LabsKeywordDataItem>
@@ -225,7 +229,7 @@ export async function fetchKeywordIdeas(input: {
       limit: input.limit,
       include_clickstream_data: input.includeClickstreamData ?? false,
       include_serp_info: false,
-      ignore_synonyms: false,
+      ignore_synonyms: input.ignoreSynonyms ?? false,
       closely_variants: false,
     },
   ]);

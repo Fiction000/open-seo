@@ -6,10 +6,10 @@ import { optionalMetaOutputSchema } from "@/server/mcp/output-schemas";
 import { buildDashboardUrl } from "@/server/mcp/urls";
 import { z } from "zod";
 
-// The org(s) whose projects the caller can see. Pinned credentials (OAuth
-// tokens, self-host) see the bound org; user-scoped credentials (API keys)
-// see every organization the user belongs to, labeled so the agent can tell
-// same-named projects apart.
+// The org(s) whose projects the caller can see. Pinned credentials (self-host,
+// SAM) see the bound org; user-scoped credentials (hosted OAuth tokens and API
+// keys) see every organization the user belongs to, labeled so the agent can
+// tell same-named projects apart.
 async function listVisibleProjects(auth: Omit<ToolContext["auth"], "baseUrl">) {
   if (auth.orgScope !== "user") {
     const projects = await ProjectService.listProjects(auth.organizationId);
@@ -43,7 +43,7 @@ export const listProjectsTool = {
     description:
       "Lists the user's projects. Uses no credits — does not call DataForSEO. Use this whenever you need a `projectId` for another OpenSEO tool. Returns an array of {id, name, domain, locationCode, languageCode}; pass the `id` value as `projectId`. locationCode/languageCode are the project's default market — tools fall back to them when a call omits location/language args. When the user belongs to several organizations, each project is labeled with its organization and organizationId (pass that to create_project).",
     inputSchema: {} as Record<string, never>,
-    outputSchema: {
+    outputSchema: z.looseObject({
       projects: z.array(
         z
           .object({
@@ -59,7 +59,7 @@ export const listProjectsTool = {
           .passthrough(),
       ),
       ...optionalMetaOutputSchema,
-    },
+    }),
     annotations: {
       readOnlyHint: true,
       openWorldHint: false,
@@ -71,7 +71,9 @@ export const listProjectsTool = {
     const projects = await listVisibleProjects(auth);
     const lines =
       projects.length === 0
-        ? ["No projects yet. Create one in the dashboard."]
+        ? [
+            "No projects yet. Ask the user for their website, then call create_project with its domain. Creating a project uses no credits.",
+          ]
         : projects.map(
             (p) =>
               `- ${p.id}  ${p.name}${p.domain ? ` (${p.domain})` : ""}${p.organization ? `  organization:${p.organization} [${p.organizationId}]` : ""}  market:${p.locationCode}/${p.languageCode}`,
