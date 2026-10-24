@@ -17,7 +17,9 @@ it("returns a generic 410 without touching stored conversation state", async () 
     },
   );
   const agent = new OnboardingChatAgent(
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- mocked base constructor needs no other runtime state; storage access must throw
     { storage } as unknown as DurableObjectState,
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- mocked base constructor and retired fetch never read environment bindings
     {} as Env,
   );
 
