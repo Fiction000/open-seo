@@ -1,8 +1,8 @@
 /**
  * Plain-language copy for Google OAuth failures, shared by the connect-surface
  * inline alert (GoogleLinkErrorAlert) and the /auth-error fallback page.
- * `code` is the `error` query param Better Auth appends on its error
- * redirects.
+ * `code` is the `error` query param on the redirect: Google's own error code
+ * (access_denied), or one set by googleOAuth.ts / Better Auth.
  *
  * `providerLabel` ("Search Console" / "Google Analytics") is set when the
  * failure came from a connect flow; without it the copy reads as a Google
@@ -27,11 +27,16 @@ export function googleAuthErrorCopy(
         description:
           "Google's permission screen was closed or declined. Try again whenever you're ready.",
       };
-    case "account_already_linked_to_different_user":
+    case "scope_not_granted":
       return {
-        title: "Google account already connected",
+        title: `${what} is missing a permission`,
+        description: `OpenSEO didn't get access to your ${providerLabel ?? "Google"} data because a box on Google's permission screen wasn't checked. Try again and check every box before you continue.`,
+      };
+    case "connection_save_failed":
+      return {
+        title: `${what} didn't finish`,
         description:
-          "That Google account is already linked to a different OpenSEO account. Disconnect it there first, or contact support and we'll move it over.",
+          "We couldn't save the connection. Please try again — if it keeps failing, contact support.",
       };
     default:
       return {

@@ -22,6 +22,7 @@ import {
   GscConnectionRepository,
   type GscConnection,
 } from "@/server/features/gsc/repositories/GscConnectionRepository";
+import { DashboardCacheService } from "@/server/features/dashboard/services/DashboardCacheService";
 import type {
   GscSearchAnalyticsRequest,
   GscSearchAnalyticsRow,
@@ -41,6 +42,8 @@ type GscSiteListResult = {
     accountId: string;
     email: string | null;
     requiresReconnect: boolean;
+    propertiesUnavailable: boolean;
+    apiDisabled: boolean;
     sites: GscSite[];
   }>;
 };
@@ -112,10 +115,16 @@ async function listSitesForUserWithGrantStatus(
           accountId: grant.accountId,
           email,
           requiresReconnect: false,
+          propertiesUnavailable: false,
+          apiDisabled: false,
           sites,
         };
       } catch (error) {
-        if (!isExpectedGrantFailure(error)) {
+        // A disabled API is a self-host setup fault, not a dead grant:
+        // reconnecting can't fix it, so log it and show the setup message.
+        const apiDisabled = error instanceof GscApiError && error.apiDisabled;
+        const requiresReconnect = isExpectedGrantFailure(error) && !apiDisabled;
+        if (!requiresReconnect) {
           console.error(
             "Failed to list Search Console sites for account",
             grant.accountId,
@@ -125,7 +134,9 @@ async function listSitesForUserWithGrantStatus(
         return {
           accountId: grant.accountId,
           email: null,
-          requiresReconnect: true,
+          requiresReconnect,
+          propertiesUnavailable: !requiresReconnect,
+          apiDisabled,
           sites: [],
         };
       }
@@ -185,41 +196,9 @@ async function setSite(input: {
   });
 }
 
-async function unlinkUserGrant(
-  userId: string,
-  gscAccountId: string,
-): Promise<void> {
-  await db
-    .delete(account)
-    .where(
-      and(
-        eq(account.userId, userId),
-        eq(account.providerId, GSC_OAUTH_PROVIDER_ID),
-        eq(account.accountId, gscAccountId),
-      ),
-    );
-}
-
-async function disconnect(input: {
-  projectId: string;
-  userId: string;
-}): Promise<void> {
-  const connection = await GscConnectionRepository.getByProjectId(
-    input.projectId,
-  );
+async function disconnect(input: { projectId: string }): Promise<void> {
   await GscConnectionRepository.deleteByProjectId(input.projectId);
-  if (
-    connection?.gscAccountId &&
-    connection.connectedByUserId === input.userId
-  ) {
-    const stillUsed = await GscConnectionRepository.existsForConnectorAccount(
-      input.userId,
-      connection.gscAccountId,
-    );
-    if (!stillUsed) {
-      await unlinkUserGrant(input.userId, connection.gscAccountId);
-    }
-  }
+  await DashboardCacheService.deleteGscCache(input.projectId);
 }
 
 /** Pass-through of GSC `searchAnalytics.query` for a project's connected property. */
@@ -233,6 +212,11 @@ async function getPerformance(
     throw new GscNotConnectedError(input.projectId);
   }
   const request = buildSearchAnalyticsRequest(input);
+  // The MCP input schema caps tool responses at 1,000; app consumers may
+  // request Google's full page to compare low-click keywords accurately.
+  if (input.rowLimit !== undefined)
+    request.rowLimit = Math.max(1, Math.min(25000, input.rowLimit));
+
   const client = createGscClient({
     userId: connection.connectedByUserId,
     gscAccountId: connection.gscAccountId ?? undefined,
@@ -259,9 +243,12 @@ type GscInspectUrlsResult = {
 };
 
 /** Inspect 1–N URLs against a project's connected property. Resolves the
- *  connection once, then inspects each URL; per-URL failures are captured
- *  inline so one bad URL doesn't fail the batch. Token/grant failures
- *  propagate so the caller can prompt a reconnect. */
+ *  connection once, then inspects every URL at once: Google answers each
+ *  inspection in ~6 s, so a serial batch of ten held the request open for a
+ *  minute and made it the usual casualty whenever its isolate ran out of
+ *  memory. Per-URL failures are captured inline so one bad URL doesn't fail
+ *  the batch. Token/grant failures propagate so the caller can prompt a
+ *  reconnect. */
 async function inspectUrls(input: {
   projectId: string;
   urls: string[];
@@ -277,24 +264,25 @@ async function inspectUrls(input: {
     userId: connection.connectedByUserId,
     gscAccountId: connection.gscAccountId ?? undefined,
   });
-  const results: GscUrlInspection[] = [];
-  for (const url of input.urls) {
-    try {
-      const result = await client.inspectUrl(
-        connection.siteUrl,
-        url,
-        input.languageCode,
-      );
-      results.push({ url, result });
-    } catch (error) {
-      if (error instanceof GscTokenError) throw error;
-      results.push({
-        url,
-        result: null,
-        error: error instanceof Error ? error.message : "Inspection failed",
-      });
-    }
-  }
+  const results = await Promise.all(
+    input.urls.map(async (url): Promise<GscUrlInspection> => {
+      try {
+        const result = await client.inspectUrl(
+          connection.siteUrl,
+          url,
+          input.languageCode,
+        );
+        return { url, result };
+      } catch (error) {
+        if (error instanceof GscTokenError) throw error;
+        return {
+          url,
+          result: null,
+          error: error instanceof Error ? error.message : "Inspection failed",
+        };
+      }
+    }),
+  );
   return {
     siteUrl: connection.siteUrl,
     connectedBy: connection.connectedAccountEmail,

@@ -1,11 +1,12 @@
 import { AppError } from "@/server/lib/errors";
 import { getRequiredEnvValue } from "@/server/lib/runtime-env";
 import type { ErrorCode } from "@/shared/error-codes";
-// Type-only: erased at compile, so no runtime cycle with envelope.ts (which
-// imports DataforseoErrorClassifier from here the same way).
-import type {
-  DataforseoResponseLike,
-  DataforseoTaskLike,
+// No runtime cycle: envelope.ts imports only the DataforseoErrorClassifier
+// type from here.
+import {
+  warnIfUpstreamResponseFailed,
+  type DataforseoResponseLike,
+  type DataforseoTaskLike,
 } from "@/server/lib/dataforseo/envelope";
 
 const API_BASE = "https://api.dataforseo.com";
@@ -118,12 +119,13 @@ function createAuthenticatedFetch(
       const classified = classify?.(response.status, rawText, path);
       if (classified) throw classified;
 
+      // An unverified account (status_code 40104) answers with 403, not 401.
       const code: ErrorCode =
         response.status >= 500
           ? "UPSTREAM_UNAVAILABLE"
           : response.status === 429
             ? "RATE_LIMITED"
-            : response.status === 401
+            : response.status === 401 || response.status === 403
               ? "DATAFORSEO_AUTH_FAILED"
               : "INTERNAL_ERROR";
       const error = new AppError(
@@ -143,6 +145,7 @@ function createAuthenticatedFetch(
       // the app to fix.
       if (code === "UPSTREAM_UNAVAILABLE")
         console.warn("dataforseo.upstream-http-failed", {
+          event: "dataforseo.upstream-http-failed",
           path,
           status: response.status,
         });
@@ -160,6 +163,9 @@ type DataforseoRequestOptions = {
    * be replayed. Defaults to retrying idempotent reads on transient 5xx.
    */
   maxServerErrorRetries?: number;
+  /** The sandbox host validates requests like production at zero cost. */
+  baseUrl?: string;
+  signal?: AbortSignal;
 };
 
 async function requestDataforseo<TTask extends DataforseoTaskLike>(
@@ -172,18 +178,21 @@ async function requestDataforseo<TTask extends DataforseoTaskLike>(
     options.classify,
     options.maxServerErrorRetries,
   );
-  const response = await doFetch(`${API_BASE}${path}`, {
+  const response = await doFetch(`${options.baseUrl ?? API_BASE}${path}`, {
     method,
     headers: {
       Accept: "application/json",
       ...(method === "POST" ? { "Content-Type": "application/json" } : {}),
     },
     body: method === "POST" ? JSON.stringify(body) : undefined,
+    signal: options.signal,
   });
   const text = await response.text();
   if (text === "") return null;
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the task type is the caller's claim about the payload; billing metadata and item fields are validated downstream (envelope.ts + section Zod schemas)
-  return JSON.parse(text) as DataforseoResponseLike<TTask>;
+  const parsed = JSON.parse(text) as DataforseoResponseLike<TTask>;
+  warnIfUpstreamResponseFailed(parsed, path);
+  return parsed;
 }
 
 /**

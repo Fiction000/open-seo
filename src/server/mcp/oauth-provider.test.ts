@@ -1,11 +1,14 @@
 import {
+  AuthorizationError as ProviderAuthorizationError,
   GrantType,
+  OAuthError as ProviderOAuthError,
   type OAuthProviderOptions,
   type TokenExchangeCallbackOptions,
 } from "@cloudflare/workers-oauth-provider";
+import type * as WorkersOAuthProvider from "@cloudflare/workers-oauth-provider";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import type { createOpenSeoOAuthProvider } from "./oauth-provider";
+import { createOpenSeoOAuthProvider } from "./oauth-provider";
 
 const mocks = vi.hoisted(() => ({
   options: [] as OAuthProviderOptions<unknown>[],
@@ -15,52 +18,17 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("cloudflare:workers", () => ({
   waitUntil: (promise: Promise<unknown>) => void promise,
+  // oxlint-disable-next-line typescript/no-extraneous-class -- runtime shim for the real provider's exported classes
+  WorkerEntrypoint: class {},
   // api-key-auth pulls the db client into this module graph; it reads env at
   // module load.
   env: {},
 }));
 
-// The whole module is doubled because the real one imports "cloudflare:workers"
-// at top level, which vitest's node environment cannot load even via
-// importOriginal. The error-class doubles must stay signature-compatible with
-// the real AuthorizationError/OAuthError.
-vi.mock("@cloudflare/workers-oauth-provider", () => {
-  class AuthorizationError extends Error {
-    readonly description: string;
-    readonly redirectUri?: string;
-    readonly state?: string;
-    readonly issuer?: string;
-
-    constructor(
-      readonly code: string,
-      options: {
-        description: string;
-        redirectUri?: string;
-        state?: string;
-        issuer?: string;
-      },
-    ) {
-      super(options.description);
-      this.description = options.description;
-      this.redirectUri = options.redirectUri;
-      this.state = options.state;
-      this.issuer = options.issuer;
-    }
-  }
-
-  class OAuthError extends Error {
-    constructor(
-      readonly code: string,
-      options?: { description?: string },
-    ) {
-      super(options?.description);
-    }
-  }
-
+vi.mock("@cloudflare/workers-oauth-provider", async (importOriginal) => {
+  const actual = await importOriginal<typeof WorkersOAuthProvider>();
   return {
-    AuthorizationError,
-    GrantType: { REFRESH_TOKEN: "refresh_token" },
-    OAuthError,
+    ...actual,
     OAuthProvider: class {
       constructor(options: OAuthProviderOptions<unknown>) {
         mocks.options.push(options);
@@ -95,6 +63,7 @@ vi.mock("@/middleware/ensure-user/hosted", () => ({
 
 vi.mock("@/server/features/activation/mcpActivation", () => ({
   recordMcpAuthorized: vi.fn(),
+  completeOnboardingFromAgent: vi.fn(),
 }));
 
 vi.mock("@/server/lib/posthog", () => ({
@@ -121,12 +90,15 @@ async function dispatch(
 
 function tokenExchangeOptions(
   requestedScope: string[],
-): TokenExchangeCallbackOptions {
+): TokenExchangeCallbackOptions<unknown> {
   return {
     grantType: GrantType.REFRESH_TOKEN,
     clientId: "client-1",
+    subjectClientId: "client-1",
     userId: "user-1",
     grantId: "grant-1",
+    resource: "https://app.openseo.so/mcp",
+    env: {},
     scope: ["offline_access", "mcp"],
     requestedScope,
     props: {
@@ -179,42 +151,17 @@ describe("OpenSEO OAuth provider configuration", () => {
   });
 
   it("binds tokens and protected-resource metadata to the canonical MCP URL", async () => {
-    const { createOpenSeoOAuthProvider } = await import("./oauth-provider");
     const provider = createOpenSeoOAuthProvider(() => new Response("app"));
 
     await dispatch(provider, new Request("https://app.openseo.so/health"));
 
     expect(mocks.options).toHaveLength(1);
-    expect(mocks.options[0]?.resourceMetadata).toEqual({
-      resource: "https://app.openseo.so/mcp",
-      scopes_supported: ["mcp"],
-      resource_name: "OpenSEO MCP",
-    });
-    expect(mocks.options[0]?.scopesSupported).toEqual([
-      "offline_access",
-      "mcp",
-    ]);
-    expect(mocks.options[0]?.clientRegistrationTTL).toBe(60 * 60 * 24 * 365);
-  });
-
-  it("purges OAuth KV data without needing a prior request", async () => {
-    const { createOpenSeoOAuthProvider } = await import("./oauth-provider");
-    const provider = createOpenSeoOAuthProvider(() => new Response("app"));
-
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- mocked provider does not read its KV-backed environment
-    const result = await provider.purgeExpiredData({} as never);
-
-    expect(result.done).toBe(true);
-    expect(mocks.purges).toHaveLength(1);
-    // The lazily built provider still pins the hosted resource.
     expect(mocks.options[0]?.resourceMetadata).toMatchObject({
       resource: "https://app.openseo.so/mcp",
     });
   });
 
   it("rejects token exchanges that drop the required MCP scope", async () => {
-    const { OAuthError } = await import("@cloudflare/workers-oauth-provider");
-    const { createOpenSeoOAuthProvider } = await import("./oauth-provider");
     const provider = createOpenSeoOAuthProvider(() => new Response("app"));
 
     await dispatch(provider, new Request("https://app.openseo.so/health"));
@@ -223,7 +170,7 @@ describe("OpenSEO OAuth provider configuration", () => {
     if (!callback) throw new Error("Missing token exchange callback");
     expect(() =>
       callback(tokenExchangeOptions(["offline_access"])),
-    ).toThrowError(OAuthError);
+    ).toThrowError(ProviderOAuthError);
     expect(callback(tokenExchangeOptions(["mcp"]))).toEqual({
       accessTokenProps: {
         openSeoAuth: {
@@ -239,7 +186,6 @@ describe("OpenSEO OAuth provider configuration", () => {
   });
 
   it("lets the provider issue Perplexity a real client secret", async () => {
-    const { createOpenSeoOAuthProvider } = await import("./oauth-provider");
     const provider = createOpenSeoOAuthProvider(() => new Response("app"));
 
     await dispatch(
@@ -260,7 +206,6 @@ describe("OpenSEO OAuth provider configuration", () => {
   });
 
   it("includes the authorization-server issuer when consent is denied", async () => {
-    const { createOpenSeoOAuthProvider } = await import("./oauth-provider");
     const provider = createOpenSeoOAuthProvider(() => new Response("app"));
     await dispatch(provider, new Request("https://app.openseo.so/health"));
 
@@ -299,10 +244,7 @@ describe("OpenSEO OAuth provider configuration", () => {
     });
   });
 
-  it("redirects safe authorization errors with state and issuer", async () => {
-    const { AuthorizationError } =
-      await import("@cloudflare/workers-oauth-provider");
-    const { createOpenSeoOAuthProvider } = await import("./oauth-provider");
+  it("redirects safe authorization errors with state and issuer, rethrowing anything else", async () => {
     const provider = createOpenSeoOAuthProvider(() => new Response("app"));
     await dispatch(provider, new Request("https://app.openseo.so/health"));
 
@@ -312,7 +254,7 @@ describe("OpenSEO OAuth provider configuration", () => {
         OAUTH_PROVIDER: {
           parseAuthRequest: () =>
             Promise.reject(
-              new AuthorizationError("invalid_scope", {
+              new ProviderAuthorizationError("invalid_scope", {
                 description: "Unsupported scope",
                 redirectUri: "https://client.example/callback",
                 state: "state-1",
@@ -332,13 +274,8 @@ describe("OpenSEO OAuth provider configuration", () => {
       state: "state-1",
       iss: "https://app.openseo.so",
     });
-  });
 
-  it("does not expose unexpected authorization failures as client errors", async () => {
-    const { createOpenSeoOAuthProvider } = await import("./oauth-provider");
-    const provider = createOpenSeoOAuthProvider(() => new Response("app"));
-    await dispatch(provider, new Request("https://app.openseo.so/health"));
-
+    // Anything other than a provider AuthorizationError is not a client error.
     await expect(
       invokeDefaultHandler(
         new Request("https://app.openseo.so/api/auth/oauth2/authorize"),

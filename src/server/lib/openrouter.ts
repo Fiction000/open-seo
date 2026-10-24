@@ -1,28 +1,51 @@
 import {
   createOpenRouter,
   type LanguageModelV3,
+  type OpenRouterProvider,
 } from "@openrouter/ai-sdk-provider";
-import {
-  getOptionalEnvValue,
-  getRequiredEnvValue,
-} from "@/server/lib/runtime-env";
+import { wrapLanguageModel } from "ai";
 
-// OpenRouter model slug used for the in-app chat agents (onboarding + SAM).
-// Override with OPENROUTER_MODEL to swap models without a code change.
+// OpenRouter model slug used for the SAM in-app chat agent. Override with
+// OPENROUTER_MODEL to swap models without a code change.
 const DEFAULT_CHAT_AGENT_MODEL = "openai/gpt-5.6-luna";
 
-// Previous default; kept reachable via OPENROUTER_MODEL for rollback. Its
-// routing needs the ZDR/provider tuning below.
+// Previous default; kept reachable via OPENROUTER_MODEL for rollback, and the
+// fallback where OpenAI is blocked. Its routing needs the ZDR/provider tuning
+// below.
 const MINIMAX_M3 = "minimax/minimax-m3";
 
-export async function getChatAgentModel(): Promise<LanguageModelV3> {
-  const apiKey = await getRequiredEnvValue("OPENROUTER_API_KEY");
-  const modelId = await getOptionalEnvValue("OPENROUTER_MODEL");
-  return buildChatAgentModel(apiKey, modelId);
+// OpenRouter rejects OpenAI models for requests from these countries ("This
+// model is not available in your region"). Workflows and Durable Objects run
+// near the user, outside prod's US placement.
+const OPENAI_BLOCKED_COUNTRIES = [
+  "CN",
+  "HK",
+  "MO",
+  "RU",
+  "BY",
+  "IR",
+  "KP",
+  "SY",
+  "CU",
+];
+
+// The country this isolate's requests leave from. An isolate stays in one
+// location, so one lookup serves its lifetime. Caches the value, not the
+// promise: Workers can't share a pending fetch across requests. Fails open: a
+// slow or failed lookup leaves the country unknown, and calls stay on OpenAI.
+let egressCountry: string | undefined;
+async function openAiBlockedHere(): Promise<boolean> {
+  egressCountry ??= await fetch("https://www.cloudflare.com/cdn-cgi/trace", {
+    signal: AbortSignal.timeout(2000),
+  })
+    .then((response) => response.text())
+    .then((trace) => /^loc=(\w+)$/m.exec(trace)?.[1] ?? "")
+    .catch(() => "");
+  return OPENAI_BLOCKED_COUNTRIES.includes(egressCountry);
 }
 
 /**
- * Returns the AI SDK LanguageModel for the chat agents. `usage: { include: true }`
+ * Returns the AI SDK LanguageModel for the chat agent. `usage: { include: true }`
  * turns on OpenRouter usage accounting so each response carries its real USD
  * cost (providerMetadata.openrouter.usage.cost) — which we meter against the
  * shared usage-credit pool.
@@ -39,12 +62,33 @@ export async function getChatAgentModel(): Promise<LanguageModelV3> {
 export function buildChatAgentModel(
   apiKey: string,
   modelId?: string,
+  reasoningEffort: "max" | "low" = "max",
 ): LanguageModelV3 {
   const model = modelId ?? DEFAULT_CHAT_AGENT_MODEL;
   const openrouter = createOpenRouter({ apiKey });
+  const primary = openRouterModel(openrouter, model, reasoningEffort);
+  if (!model.startsWith("openai/")) return primary;
+  // Where OpenRouter would reject OpenAI, pick MiniMax M3 before the request.
+  // The country lookup is async and getModel() is sync, so it runs per call.
+  const fallback = openRouterModel(openrouter, MINIMAX_M3, reasoningEffort);
+  const pick = async () => ((await openAiBlockedHere()) ? fallback : primary);
+  return wrapLanguageModel({
+    model: primary,
+    middleware: {
+      specificationVersion: "v3",
+      wrapGenerate: async ({ params }) => (await pick()).doGenerate(params),
+      wrapStream: async ({ params }) => (await pick()).doStream(params),
+    },
+  });
+}
 
-  // MiniMax M3 (env-override path only): `provider.order` prefers Together,
-  // then Atlas Cloud (fp8); `zdr: true` restricts routing to Zero-Data-
+function openRouterModel(
+  openrouter: OpenRouterProvider,
+  model: string,
+  reasoningEffort: "max" | "low",
+): LanguageModelV3 {
+  // MiniMax M3 (env override or OpenAI fallback): `provider.order` prefers
+  // Together, then Atlas Cloud (fp8); `zdr: true` restricts routing to Zero-Data-
   // Retention endpoints, which excludes MiniMax first-party — the account's
   // "Non-frontier requires ZDR" data policy enforces the same, this flag is
   // belt-and-braces. Fallbacks stay on within the ZDR set because pinning
@@ -54,7 +98,7 @@ export function buildChatAgentModel(
   if (model === MINIMAX_M3) {
     return openrouter(model, {
       usage: { include: true },
-      reasoning: { effort: "medium" },
+      reasoning: { effort: reasoningEffort === "low" ? "low" : "medium" },
       provider: {
         order: ["together", "atlas-cloud/fp8"],
         zdr: true,
@@ -65,6 +109,6 @@ export function buildChatAgentModel(
 
   return openrouter(model, {
     usage: { include: true },
-    extraBody: { reasoning: { effort: "max" } },
+    extraBody: { reasoning: { effort: reasoningEffort } },
   });
 }

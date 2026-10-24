@@ -1,13 +1,8 @@
 import { captureClientEvent } from "@/client/lib/posthog";
-
-/**
- * Marker appended to the errorCallbackURL so a failed Google link redirect can
- * be told apart from any other `error` query param. Its value is the provider
- * key ("gsc" | "ga4").
- */
-export const GOOGLE_LINK_ERROR_PARAM = "google_link_error";
-
-export type GoogleLinkProvider = "gsc" | "ga4";
+import {
+  GOOGLE_LINK_ERROR_PARAM,
+  type GoogleLinkProvider,
+} from "@/shared/google-link";
 
 type CapturedLinkError = {
   provider: GoogleLinkProvider;
@@ -31,7 +26,6 @@ function captureLinkErrorFromLocation(): CapturedLinkError | null {
   const code = url.searchParams.get("error") ?? "unknown";
   url.searchParams.delete(GOOGLE_LINK_ERROR_PARAM);
   url.searchParams.delete("error");
-  url.searchParams.delete("error_description");
   // history.replaceState rather than a router navigate: the params are
   // one-shot and foreign to every route's search schema, and the router (not
   // yet started) should never see them. Passing the current history.state
