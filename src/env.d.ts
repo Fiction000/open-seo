@@ -4,6 +4,8 @@
 declare namespace Cloudflare {
   interface Env {
     R2: R2Bucket;
+    // Alchemy binds this only where the app worker uses static assets.
+    ASSETS?: Fetcher;
     // Browser Run binding for site-audit JavaScript rendering, audit worker
     // only. Inline import preserves the ambient Env augmentation.
     // oxlint-disable-next-line typescript-eslint/consistent-type-imports
@@ -32,6 +34,10 @@ declare namespace Cloudflare {
     BYPASS_EMAIL_VERIFICATION?: string;
     TEAM_DOMAIN?: string;
     POLICY_AUD?: string;
+    MCP_GATEWAY_ENABLED?: string;
+    MCP_GATEWAY_AUD?: string;
+    MCP_GATEWAY_CLIENT_ID?: string;
+    MCP_GATEWAY_ORGANIZATION_ID?: string;
     POSTHOG_PUBLIC_KEY?: string;
     POSTHOG_HOST?: string;
     BETTER_AUTH_SECRET?: string;
