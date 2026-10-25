@@ -14,7 +14,6 @@ export function makeToolContext(
       scopes: ["mcp"],
       baseUrl: "https://open-seo.test",
       ...overrides,
-      principal: overrides.principal ?? { kind: "human" },
     },
   };
 }
