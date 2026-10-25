@@ -101,6 +101,15 @@ async function getHostedUser(userId: string) {
   });
 }
 
+async function organizationExists(organizationId: string) {
+  const [existingOrganization] = await db
+    .select({ id: organization.id })
+    .from(organization)
+    .where(eq(organization.id, organizationId))
+    .limit(1);
+  return Boolean(existingOrganization);
+}
+
 async function getOrganizationOwner(organizationId: string) {
   const [owner] = await db
     .select({ id: authUser.id, email: authUser.email })
@@ -351,6 +360,7 @@ export const AuthRepository = {
   setProductUpdatesOptIn,
   getHostedUser,
   getHostedUserNames,
+  organizationExists,
   getOrganizationOwner,
   hasPendingInvitationForEmail,
   isAnalyticsOptedOut,
