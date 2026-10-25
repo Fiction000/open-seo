@@ -71,6 +71,18 @@
       "POLICY_AUD": {
         "description": "Cloudflare Access Application Audience (AUD) tag for this Worker route/domain."
       },
+      "MCP_GATEWAY_ENABLED": {
+        "description": "Set to strict `true` only to enable the self-host OpenSEO machine MCP lane."
+      },
+      "MCP_GATEWAY_AUD": {
+        "description": "Dedicated Cloudflare Access audience for the OpenSEO machine MCP app."
+      },
+      "MCP_GATEWAY_CLIENT_ID": {
+        "description": "Allowed Cloudflare Access service-token client ID, matched to JWT common_name."
+      },
+      "MCP_GATEWAY_ORGANIZATION_ID": {
+        "description": "Existing organization pinned for the OpenSEO machine MCP identity."
+      },
       "DATAFORSEO_API_KEY": {
         "description": "Base64-encoded `login:password` for DataForSEO API access."
       },
