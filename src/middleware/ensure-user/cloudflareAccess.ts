@@ -80,9 +80,12 @@ export async function resolveCloudflareAccessContext(
       audience: policyAud,
     }));
   } catch (error) {
-    // The classified AppError carries operator guidance; log the raw jose
-    // error too, since it is the only place the underlying cause survives.
-    console.error("Cloudflare Access token verification failed:", error);
+    console.warn(
+      JSON.stringify({
+        event: "access_token_rejected",
+        code: "verification_failed",
+      }),
+    );
 
     throw classifyAccessVerificationError(error);
   }

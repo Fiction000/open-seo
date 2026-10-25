@@ -4,7 +4,14 @@ import type { BillingCustomerContext } from "@/server/billing/subscription";
 import { resolveClientLabel } from "@/server/mcp/client-label";
 import { buildDashboardUrl } from "@/server/mcp/urls";
 
+export type ToolPrincipal =
+  | { kind: "human" }
+  | { kind: "machine"; service: "litellm-openseo"; commonName: string };
+
+export const MCP_GATEWAY_ALLOWED_TOOLS = ["whoami", "list_projects"] as const;
+
 export type ToolAuthContext = {
+  principal: ToolPrincipal;
   userId: string;
   userEmail: string;
   organizationId: string;
@@ -42,7 +49,17 @@ export type ToolContext = {
 export const MCP_AUTH_CONTEXT_PROP = "openSeoAuth";
 export const MCP_ROUTE = "/mcp";
 
+const principalSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("human") }),
+  z.object({
+    kind: z.literal("machine"),
+    service: z.literal("litellm-openseo"),
+    commonName: z.string().min(1),
+  }),
+]);
+
 const applicationAuthContextSchema = z.object({
+  principal: principalSchema.optional(),
   userId: z.string().min(1),
   userEmail: z.string().min(1),
   organizationId: z.string().min(1),
@@ -149,6 +166,7 @@ export function createMcpToolContext(
 
   return {
     auth: {
+      principal: applicationAuth.principal ?? { kind: "human" },
       ...applicationAuth,
       role,
       orgScope,

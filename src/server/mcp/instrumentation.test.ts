@@ -41,6 +41,7 @@ function okResult(structuredContent: Record<string, unknown>): CallToolResult {
 }
 
 const authContext: ToolAuthContext = {
+  principal: { kind: "human" },
   userId: "user-1",
   userEmail: "user@example.com",
   organizationId: "org-1",
