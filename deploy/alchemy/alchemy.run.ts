@@ -5,8 +5,7 @@ import * as ZeroTrust from "@distilled.cloud/cloudflare/zero-trust";
 import * as Config from "effect/Config";
 import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
-import { makeWorkerAssets } from "./alchemy.assets.ts";
-import { makeDataEnv, makeMcpGatewayEnv, optionalVar } from "./alchemy.env.ts";
+import { makeDataEnv, optionalVar } from "./alchemy.env.ts";
 import { unstable_readConfig } from "wrangler";
 import { z } from "zod";
 import {
@@ -415,7 +414,9 @@ export default Alchemy.Stack(
       // assets/ are uploaded as-is by the default module rules.
       main: "./dist/server/index.js",
       bundle: false,
-      assets: makeWorkerAssets(stage),
+      assets: {
+        directory: "./dist/client",
+      },
       compatibility: {
         date: wrangler.compatibility_date,
         flags: wrangler.compatibility_flags,
@@ -455,10 +456,10 @@ export default Alchemy.Stack(
         AUDIT_BROWSER_RENDERING: "true",
         TEAM_DOMAIN: access.teamDomain,
         POLICY_AUD: access.policyAud,
-        ...makeMcpGatewayEnv(stage),
 
-        // Service binding to the audit worker's AuditEngine entrypoint (cancel +
-        // GDPR erasure of scratchpad state; env key = binding name).
+        // Service binding to the audit worker's AuditEngine entrypoint
+        // (cancel + GDPR erasure of scratchpad state; env key = binding
+        // name).
         AUDIT_ENGINE: auditWorker,
 
         // Per-user throttle for /mcp API-key auth (see

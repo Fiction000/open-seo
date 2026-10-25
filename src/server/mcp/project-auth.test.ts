@@ -55,7 +55,6 @@ describe("withMcpProjectAuth", () => {
           orgScope: "pinned",
           clientId: "client_123",
           scopes: ["mcp"],
-          principal: { kind: "human" },
         },
         baseUrl: "https://open-seo.test",
         billing: {
