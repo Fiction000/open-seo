@@ -322,6 +322,7 @@ export class SamChatAgent extends Think {
           "I couldn't find this chat session. Please start a new one.",
         );
       }
+      const userId = ctx.row.userId;
 
       // Gate every turn on credits in hosted mode: SAM is open to every plan
       // (including free), and LLM tokens plus DataForSEO tool calls all draw
@@ -329,13 +330,13 @@ export class SamChatAgent extends Think {
       // keys and has no Autumn balance, so it's ungated. Depletion is
       // confirmed against a second Autumn read path before refusing — a
       // stale check reading here once locked a paying customer out of chat.
-      const { organizationId } = ctx.project;
+      const { organizationId: orgId } = ctx.project;
       const hosted = await isHostedServerAuthMode();
       if (hosted) {
         const { depleted, monthlyRemaining } = await checkUsageCreditsDepleted({
-          userId: ctx.row.userId,
+          userId,
           userEmail: ctx.userEmail,
-          organizationId,
+          organizationId: orgId,
           projectId: ctx.project.id,
         });
         if (depleted) {
@@ -355,10 +356,7 @@ export class SamChatAgent extends Think {
       // workspace; fail closed instead of letting the open socket keep
       // owner-level tools (WebSockets authorize at connect time only, so this
       // per-turn check is what actually revokes a removed member's chat).
-      const membership = await AuthRepository.getMembership(
-        ctx.row.userId,
-        organizationId,
-      );
+      const membership = await AuthRepository.getMembership(userId, orgId);
       if (hosted && !membership) {
         turn.refusal = "no_access";
         return this.refusalTurn(
@@ -366,12 +364,12 @@ export class SamChatAgent extends Think {
         );
       }
       const authContext: ToolAuthContext = {
-        userId: ctx.row.userId,
+        principal: { kind: "human" },
+        userId,
         userEmail: ctx.userEmail,
-        organizationId,
+        organizationId: orgId,
         role: membership?.role ?? "owner",
-        // SAM sessions belong to one project's workspace; org context is
-        // fixed for the session, like an OAuth token's.
+        // SAM stays bound to one project's workspace for the session.
         orgScope: "pinned",
         baseUrl,
         clientId: null,
