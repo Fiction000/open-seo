@@ -104,6 +104,14 @@
     // Dispatched on controller.cron in src/server.ts `scheduled`.
     "crons": ["*/5 * * * *", "17 3 * * *"],
   },
+  // Local dev / Docker self-host keep the gateway disabled by default.
+  // Supply deployment-specific values outside this file; never place IDs here.
+  "vars": {
+    "MCP_GATEWAY_ENABLED": "false",
+    "MCP_GATEWAY_AUD": "",
+    "MCP_GATEWAY_CLIENT_ID": "",
+    "MCP_GATEWAY_ORGANIZATION_ID": "",
+  },
   // This config serves local dev and Docker self-host only. All Cloudflare
   // deployments — previews, prod, self-host — go through Alchemy
   // (deploy/alchemy/alchemy.run.ts), which provisions real resources per stage and never
