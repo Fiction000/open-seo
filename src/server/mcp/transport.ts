@@ -18,11 +18,6 @@ import {
   MCP_ROUTE,
   type McpProps,
 } from "@/server/mcp/context";
-import {
-  gatewayHttpError,
-  isMcpGatewayRequestTarget,
-  resolveMcpGatewayIdentity,
-} from "@/server/mcp/gateway-auth";
 import { getPublicOrigin } from "@/server/mcp/public-origin";
 import { createOpenSeoMcpServer } from "@/server/mcp/server";
 import { supportsMcpApps } from "@/server/mcp/ui-capabilities";
@@ -181,7 +176,7 @@ async function resolveRequestOrganization(
   return resolveExistingActiveHostedOrganization(userId);
 }
 
-async function handleAuthenticatedOpenSeoMcpRequestImpl(
+export async function handleAuthenticatedOpenSeoMcpRequest(
   request: Request,
   props: unknown,
   env: unknown,
@@ -245,72 +240,32 @@ async function handleAuthenticatedOpenSeoMcpRequestImpl(
   ])(request, env, ctx);
 }
 
-export async function handleAuthenticatedOpenSeoMcpRequest(
-  request: Request,
-  props: unknown,
-  env: unknown,
-  ctx: ExecutionContext,
-): Promise<Response> {
-  try {
-    return await handleAuthenticatedOpenSeoMcpRequestImpl(
-      request,
-      props,
-      env,
-      ctx,
-    );
-  } catch (error) {
-    console.error(
-      JSON.stringify({ event: "mcp_http_error", code: "internal_error" }),
-    );
-    return gatewayHttpError(error);
-  }
-}
-
 export async function handleSelfHostedOpenSeoMcpRequest(
   request: Request,
   authMode: "cloudflare_access" | "local_noauth",
   env: unknown,
   ctx: ExecutionContext,
 ): Promise<Response> {
-  try {
-    // Preflight has no application context and never reaches MCP dispatch.
-    if (request.method === "OPTIONS") {
-      return new Response(null, { headers: MCP_CORS_HEADERS });
-    }
-
-    if (isMcpGatewayRequestTarget(request)) {
-      const identity = await resolveMcpGatewayIdentity(request, env);
-      const props = createWorkersOAuthMcpProps({
-        ...identity,
-        baseUrl: new URL(request.url).origin,
-        userAgent: request.headers.get("user-agent") ?? undefined,
-      });
-      return await createRequestHandler(props, false)(request, env, ctx);
-    }
-
-    const identity =
-      authMode === "local_noauth"
-        ? await resolveLocalNoAuthContext()
-        : await resolveCloudflareAccessContext(request.headers);
-    const props = createWorkersOAuthMcpProps({
-      userId: identity.userId,
-      userEmail: identity.userEmail,
-      organizationId: identity.organizationId,
-      baseUrl: getPublicOrigin(request),
-      userAgent: request.headers.get("user-agent") ?? undefined,
-    });
-
-    return await createRequestHandler(props, await supportsMcpApps(request))(
-      request,
-      env,
-      ctx,
-    );
-  } catch (error) {
-    if (!(error instanceof Error && "failure" in error)) {
-      console.error(
-        JSON.stringify({ event: "mcp_http_error", code: "internal_error" }),
-      );
-    }
-    return gatewayHttpError(error);
+  // Preflight does not carry an authenticated application context.
+  if (request.method === "OPTIONS") {
+    return new Response(null, { headers: MCP_CORS_HEADERS });
   }
+
+  const identity =
+    authMode === "local_noauth"
+      ? await resolveLocalNoAuthContext()
+      : await resolveCloudflareAccessContext(request.headers);
+  const props = createWorkersOAuthMcpProps({
+    userId: identity.userId,
+    userEmail: identity.userEmail,
+    organizationId: identity.organizationId,
+    baseUrl: getPublicOrigin(request),
+    userAgent: request.headers.get("user-agent") ?? undefined,
+  });
+
+  return createRequestHandler(props, await supportsMcpApps(request))(
+    request,
+    env,
+    ctx,
+  );
 }

@@ -18,12 +18,6 @@ import {
 } from "@/server/mcp/oauth-provider";
 import { requestWithPublicOrigin } from "@/server/mcp/public-origin";
 import { MCP_ROUTE } from "@/server/mcp/context";
-import {
-  MCP_GATEWAY_HOST,
-  gatewayHttpError,
-  isMcpGatewayCandidate,
-  isMcpGatewayRequestTarget,
-} from "@/server/mcp/gateway-auth";
 import { withPgClient } from "@/db";
 import {
   AUTUMN_WEBHOOK_PATH,
@@ -68,24 +62,6 @@ async function appFetch(request: Request): Promise<Response> {
 }
 
 const openSeoOAuthProvider = createOpenSeoOAuthProvider(appFetch);
-
-const MCP_GATEWAY_STATIC_ASSETS = new Set([
-  "/android-chrome-192x192.png",
-  "/android-chrome-512x512.png",
-  "/apple-touch-icon.png",
-  "/favicon-16x16.png",
-  "/favicon-32x32.png",
-  "/favicon.ico",
-  "/favicon.png",
-  "/site.webmanifest",
-  "/transparent-logo.png",
-]);
-
-function isMcpGatewayStaticAsset(pathname: string) {
-  return (
-    pathname.startsWith("/assets/") || MCP_GATEWAY_STATIC_ASSETS.has(pathname)
-  );
-}
 
 // Authorize a SAM agent connection in the Worker, before it reaches the Durable
 // Object. The DO instance name is the sessionId (set client-side); we resolve
@@ -164,36 +140,7 @@ function handleFetch(
   env: Env,
   ctx: ExecutionContext,
 ): Response | Promise<Response> {
-  const requestUrl = new URL(request.url);
-  const requestPathname = requestUrl.pathname;
   const authMode = getAuthMode(env.AUTH_MODE);
-  const gatewayTarget = isMcpGatewayRequestTarget(request);
-  if (
-    authMode === "cloudflare_access" &&
-    isMcpGatewayCandidate(request, env) &&
-    !gatewayTarget
-  ) {
-    return Response.json({ error: "forbidden" }, { status: 403 });
-  }
-  if (gatewayTarget) {
-    if (authMode !== "cloudflare_access") {
-      return Response.json({ error: "forbidden" }, { status: 403 });
-    }
-    return import("@/server/mcp/transport")
-      .then(({ handleSelfHostedOpenSeoMcpRequest }) =>
-        handleSelfHostedOpenSeoMcpRequest(request, authMode, env, ctx),
-      )
-      .catch(gatewayHttpError);
-  }
-
-  if (
-    requestUrl.hostname === MCP_GATEWAY_HOST &&
-    isMcpGatewayStaticAsset(requestPathname) &&
-    env.ASSETS
-  ) {
-    return env.ASSETS.fetch(request);
-  }
-
   const publicRequest = requestWithPublicOrigin(request);
   const pathname = new URL(publicRequest.url).pathname;
   ctx.waitUntil(maybeSendSelfHostHeartbeat(pathname));
