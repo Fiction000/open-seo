@@ -68,6 +68,18 @@
       "TEAM_DOMAIN": {
         "description": "Cloudflare Access team domain (for example `https://your-team.cloudflareaccess.com`) used to validate `cf-access-jwt-assertion` JWTs."
       },
+      "MCP_GATEWAY_ENABLED": {
+        "description": "Set to `true` only to enable the restricted shared machine MCP gateway on `seo.katot.dev`."
+      },
+      "MCP_GATEWAY_AUD": {
+        "description": "Cloudflare Access service-token audience required by the restricted shared machine MCP gateway."
+      },
+      "MCP_GATEWAY_CLIENT_ID": {
+        "description": "Cloudflare Access service-token client ID accepted by the restricted shared machine MCP gateway."
+      },
+      "MCP_GATEWAY_ORGANIZATION_ID": {
+        "description": "Pinned shared organization ID for the restricted shared machine MCP gateway; must be the shared-workspace organization."
+      },
       "POLICY_AUD": {
         "description": "Cloudflare Access Application Audience (AUD) tag for this Worker route/domain."
       },

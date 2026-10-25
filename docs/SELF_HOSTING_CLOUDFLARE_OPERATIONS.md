@@ -26,6 +26,10 @@ MCP clients should connect to:
 https://YOUR_WORKER_HOSTNAME/mcp
 ```
 
+This self-hosted user connection exposes the configured OpenSEO MCP tools to the authenticated user. It is distinct from the restricted shared machine gateway operated at `https://seo.katot.dev/mcp`, which uses Cloudflare Access service-token settings `MCP_GATEWAY_ENABLED`, `MCP_GATEWAY_AUD`, `MCP_GATEWAY_CLIENT_ID`, and `MCP_GATEWAY_ORGANIZATION_ID`.
+
+The shared gateway is pinned to its shared organization and permits only `whoami`, `list_projects`, `get_search_console_performance`, `inspect_urls`, `get_google_analytics_organic_landing_pages`, `get_google_analytics_page_performance`, `get_google_analytics_key_events`, `get_search_opportunities`, `get_google_analytics_organic_overview`, `get_google_analytics_traffic_acquisition`, `get_google_analytics_ecommerce_performance`, `get_google_analytics_site_search`, `get_google_analytics_audience_breakdown`, and `get_google_analytics_measurement_health`. Its identity reports `mcp:read` as a descriptive machine permission label. The enforced boundary remains this tool allowlist plus the pinned organization. It cannot create projects, change Google connections, run paid research or rank tracking, run audits, or mutate data. Search Console and Analytics reporting use Google's quotas, not OpenSEO credits.
+
 ## AI visibility tracking
 
 AI Visibility uses your `DATAFORSEO_API_KEY`; tracked questions are sent to DataForSEO and billed directly by the provider. Set `OPENROUTER_API_KEY` for setup research, Prompt Research, and generated prompt suggestions. Deployment configures background collection and a five-minute cron that dispatches due daily, weekly, or monthly checks. The app shows the collection cost before a check or schedule starts. See the [AI Visibility guide](https://openseo.so/docs/ai-visibility).

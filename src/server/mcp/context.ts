@@ -8,7 +8,22 @@ export type ToolPrincipal =
   | { kind: "human" }
   | { kind: "machine"; service: "litellm-openseo"; commonName: string };
 
-export const MCP_GATEWAY_ALLOWED_TOOLS = ["whoami", "list_projects"] as const;
+export const MCP_GATEWAY_ALLOWED_TOOLS = [
+  "whoami",
+  "list_projects",
+  "get_search_console_performance",
+  "inspect_urls",
+  "get_google_analytics_organic_landing_pages",
+  "get_google_analytics_page_performance",
+  "get_google_analytics_key_events",
+  "get_search_opportunities",
+  "get_google_analytics_organic_overview",
+  "get_google_analytics_traffic_acquisition",
+  "get_google_analytics_ecommerce_performance",
+  "get_google_analytics_site_search",
+  "get_google_analytics_audience_breakdown",
+  "get_google_analytics_measurement_health",
+] as const;
 
 export type ToolAuthContext = {
   principal: ToolPrincipal;

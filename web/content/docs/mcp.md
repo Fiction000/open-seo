@@ -157,6 +157,12 @@ OpenSEO MCP exposes tools for SEO research workflows:
 - Save and read HTML reports on a project (free, no credits). New reports are private. On hosted OpenSEO, explicitly ask the agent to publish with `set_report_sharing` (`public: true`) or revoke the link (`public: false`). `get_report` returns `report.shareUrl` for an existing public link, or `null` when unavailable.
 - List a project's report templates, and save a reusable report brief to the project (free, no credits).
 
+## Shared machine gateway
+
+The general MCP connection above exposes the tools available to the signed-in user, including paid research and project setup. The separately operated shared machine gateway at `https://seo.katot.dev/mcp` has a smaller server-side allowlist, pinned to one shared organization. Its descriptive identity scope is `mcp:read`; authorization is enforced by the gateway's tool allowlist and pinned organization, not by OAuth scopes.
+
+The gateway allows only `whoami`, `list_projects`, `get_search_console_performance`, `inspect_urls`, `get_google_analytics_organic_landing_pages`, `get_google_analytics_page_performance`, `get_google_analytics_key_events`, `get_search_opportunities`, `get_google_analytics_organic_overview`, `get_google_analytics_traffic_acquisition`, `get_google_analytics_ecommerce_performance`, `get_google_analytics_site_search`, `get_google_analytics_audience_breakdown`, and `get_google_analytics_measurement_health`. It cannot create projects, change Google connections, run paid research or rank tracking, run audits, or perform mutations. Google reporting uses Google's service quotas, not OpenSEO credits.
+
 ## What to do after setup
 
 See the [AI Visibility guide](/docs/ai-visibility) for supported engines, research coverage, and costs.

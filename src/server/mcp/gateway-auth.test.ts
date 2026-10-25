@@ -142,7 +142,7 @@ describe("OpenSEO machine MCP HTTP authentication", () => {
         result: z.object({ tools: z.array(z.object({ name: z.string() })) }),
       })
       .parse(await listed.json());
-    expect(tools.tools).toHaveLength(2);
+    expect(tools.tools).toHaveLength(14);
     expect(tools.tools).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ name: "list_projects" }),
@@ -165,6 +165,7 @@ describe("OpenSEO machine MCP HTTP authentication", () => {
       .parse(await whoami.json());
     expect(whoamiBody.result.structuredContent).toMatchObject({
       userEmail: "litellm-gateway@openseo.invalid",
+      scopes: ["mcp:read"],
       mode: "self-hosted",
       creditsRemaining: null,
     });
@@ -200,6 +201,25 @@ describe("OpenSEO machine MCP HTTP authentication", () => {
       .object({ error: z.object({ code: z.number() }).optional() })
       .parse(await paid.json());
     expect(paidBody.error?.code).toBe(-32602);
+    for (const name of [
+      "research_keywords",
+      "create_project",
+      "set_google_analytics_property",
+      "run_site_audit",
+      "run_rank_tracker",
+      "delete_report",
+      "not_a_real_tool",
+    ]) {
+      const denied = await handle(
+        "tools/call",
+        { name, arguments: { projectId: "shared-project-1" } },
+        token,
+      );
+      expect(denied.status).toBe(200);
+      expect(await denied.json()).toMatchObject({
+        error: { code: -32602 },
+      });
+    }
   });
 
   it.each([

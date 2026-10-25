@@ -17,6 +17,7 @@ type GatewayIdentity = {
   organizationId: string;
   role: "member";
   orgScope: "pinned";
+  scopes: string[];
   clientId: string;
   principal: {
     kind: "machine";
@@ -181,6 +182,7 @@ export async function resolveMcpGatewayIdentity(
     organizationId,
     role: "member",
     orgScope: "pinned",
+    scopes: ["mcp:read"],
     clientId,
     principal: {
       kind: "machine",
