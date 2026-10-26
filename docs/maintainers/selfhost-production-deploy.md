@@ -8,7 +8,7 @@ PR イベントでは資格情報なしの checks だけを実行する。`workf
 
 JST の `[06:10, 07:25)` と `[16:30, 17:30)` は更新しない。開始時刻を含み、終了時刻を含まない。最初の判定が禁止時間なら deploy job を skip する。直前判定で禁止時間に入った場合も upload と本番確認を skip する。helper 実行中に禁止時間へ入ると、次の更新前にエラーで止まる。
 
-deploy job は `open-seo-selfhost-production` concurrency group で直列化し、実行中の job をキャンセルしない。GitHub の concurrency は待機 run 全件の保存や FIFO を保証しない。時間外に main から手動実行できる。古い SHA は拒否する。
+deploy job は `open-seo-selfhost-production` concurrency group で直列化し、実行中の job をキャンセルしない。GitHub の concurrency は待機 run 全件の保存や FIFO を保証しない。禁止時間外に main から手動実行できる。古い SHA は拒否する。
 
 ## 更新する範囲
 
