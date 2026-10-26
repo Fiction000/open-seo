@@ -1,0 +1,147 @@
+name: Selfhost production
+
+on:
+  pull_request:
+  workflow_run:
+    workflows: [CI]
+    branches: [main]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    if: >-
+      github.repository == 'Fiction000/open-seo' &&
+      (github.event_name == 'pull_request' ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == 'Fiction000/open-seo'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    timeout-minutes: 30
+    outputs:
+      sha: ${{ steps.candidate.outputs.sha }}
+    steps:
+      - name: Select immutable candidate
+        id: candidate
+        env:
+          SHA: ${{ github.event.workflow_run.head_sha || github.event.pull_request.head.sha || github.sha }}
+        run: |
+          [[ "$SHA" =~ ^[0-9a-f]{40}$ ]]
+          printf 'sha=%s\n' "$SHA" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ steps.candidate.outputs.sha }}
+          persist-credentials: false
+      # workflow_run follows the existing CI workflow, including its Docker job.
+      # Manual runs must prove the same exact main SHA passed that workflow.
+      - name: Verify successful push CI for this exact SHA
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_SHA: ${{ steps.candidate.outputs.sha }}
+          GH_REPO: Fiction000/open-seo
+        run: |
+          run_id=$(gh api "repos/$GH_REPO/actions/workflows/ci.yml/runs?head_sha=$CANDIDATE_SHA&event=push&status=success&per_page=100" \
+            --jq '.workflow_runs | map(select(.head_branch == "main" and .head_repository.full_name == "Fiction000/open-seo")) | first | .id // empty')
+          test -n "$run_id"
+          gh api --paginate "repos/$GH_REPO/actions/runs/$run_id/jobs?per_page=100" \
+            --jq '.jobs[] | [.name, .conclusion] | @tsv' > "$RUNNER_TEMP/passed-jobs.tsv"
+          grep -qx $'ci\tsuccess' "$RUNNER_TEMP/passed-jobs.tsv"
+          grep -qx $'docker-build\tsuccess' "$RUNNER_TEMP/passed-jobs.tsv"
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24.12.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Test selfhost safety gates
+        run: node --test scripts/selfhost-ci/*.test.mjs
+      - run: pnpm build:report-widgets
+      - name: Build selfhost Worker bundles
+        env:
+          AUTH_MODE: cloudflare_access
+          VITE_SHOW_DEVTOOLS: "false"
+        run: pnpm vite build --mode selfhost
+      - run: pnpm exec tsc --noEmit
+      - name: Validate code-only upload metadata without credentials
+        run: node scripts/selfhost-ci/offline-plan.mjs
+
+  deploy-window:
+    needs: checks
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      allowed: ${{ steps.window.outputs.allowed }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.checks.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24.12.0
+      - name: Check JST deployment window
+        id: window
+        run: node scripts/selfhost-ci/deploy-window.mjs
+
+  deploy:
+    needs: [checks, deploy-window]
+    if: github.event_name != 'pull_request' && needs.deploy-window.outputs.allowed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    concurrency:
+      group: open-seo-selfhost-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.checks.outputs.sha }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24.12.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build:report-widgets
+      - name: Build the verified selfhost candidate
+        env:
+          AUTH_MODE: cloudflare_access
+          VITE_SHOW_DEVTOOLS: "false"
+        run: pnpm vite build --mode selfhost
+      - name: Recheck window immediately before deployment
+        id: final-window
+        run: node scripts/selfhost-ci/deploy-window.mjs
+      - name: Require all deployment and verification credentials before writes
+        if: steps.final-window.outputs.allowed == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_ACCESS_CLIENT_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
+          CLOUDFLARE_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -n "$CLOUDFLARE_ACCESS_CLIENT_ID"
+          test -n "$CLOUDFLARE_ACCESS_CLIENT_SECRET"
+      - name: Upload and activate code only
+        if: steps.final-window.outputs.allowed == 'true'
+        env:
+          CANDIDATE_SHA: ${{ needs.checks.outputs.sha }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/selfhost-ci/deploy-runtime.mjs --deploy
+      - name: Check production through Access without following redirects
+        if: steps.final-window.outputs.allowed == 'true'
+        env:
+          CLOUDFLARE_ACCESS_CLIENT_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
+          CLOUDFLARE_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
+        run: node scripts/selfhost-ci/health-check.mjs
