@@ -34,7 +34,7 @@ test("newest deployment alone is active; split, pending and mismatched versions 
   assert.throws(() => activeId(snapshot.deployments), /100%/);
 });
 
-test("all runtime bindings inherit from pinned active UUID without values or provisioning declarations", () => {
+test("stable version upload inherits latest without values or provisioning declarations", () => {
   const snapshot = fixtureSnapshot();
   for (const worker of WORKERS) {
     const active = validateSnapshot(snapshot[worker], worker);
@@ -43,7 +43,7 @@ test("all runtime bindings inherit from pinned active UUID without values or pro
       config.unsafe.bindings,
       active.resources.bindings
         .filter((b) => b.type !== "assets")
-        .map((b) => ({ name: b.name, type: "inherit", version_id: active.id })),
+        .map((b) => ({ name: b.name, type: "inherit", version_id: "latest" })),
     );
     for (const key of [
       "routes",
@@ -131,6 +131,7 @@ function harness({ changeActive = false, readbackMismatch = false } = {}) {
   const events = [];
   const current = Object.fromEntries(WORKERS.map((w, i) => [w, SOURCE_IDS[i]]));
   let uploads = 0;
+  const staged = {};
   const exec = async (command, args, options) => {
     if (command === "git") {
       events.push("guard");
@@ -147,6 +148,7 @@ function harness({ changeActive = false, readbackMismatch = false } = {}) {
     const index = WORKERS.indexOf(config.name);
     assert(index >= 0);
     uploads++;
+    staged[config.name] = UPLOAD_IDS[index];
     events.push(`upload:${index}`);
     await writeFile(
       options.env.WRANGLER_OUTPUT_FILE_PATH,
@@ -186,7 +188,12 @@ function harness({ changeActive = false, readbackMismatch = false } = {}) {
         ],
       };
     } else if (collection === "versions")
-      result = { items: snapshots[worker].versions };
+      result = {
+        items: [
+          ...(staged[worker] ? [{ id: staged[worker] }] : []),
+          ...snapshots[worker].versions,
+        ],
+      };
     else if (collection === `versions/${SOURCE_IDS[index]}`)
       result = snapshots[worker].active;
     else assert.fail(`Unexpected endpoint ${collection}`);
@@ -227,6 +234,91 @@ test("manual deployment race prevents activation and failed readback prevents ap
   );
   assert(!mismatch.events.includes("activate:1"));
 });
+
+test("failed Wrangler upload reports safe API details and never activates either Worker", async () => {
+  const h = harness();
+  const exec = async (command, args, options) => {
+    if (command === "git") return h.exec(command, args, options);
+    const path = "/accounts/private-account/workers/services/private-worker";
+    throw Object.assign(new Error("DO-NOT-LOG binding values"), {
+      code: 1,
+      stdout: `-- START CF API REQUEST: GET https://api.cloudflare.com/client/v4${path}\n-- START CF API RESPONSE: Forbidden 403\n`,
+      stderr: `[ERROR] A request to the Cloudflare API (${path}) failed.\n  Authentication error [code: 10000]\nDO-NOT-LOG`,
+    });
+  };
+  await assert.rejects(
+    run({ mode: "deploy", env, now, fetchImpl: h.fetchImpl, exec }),
+    (error) => {
+      assert.match(
+        error.message,
+        /HTTP=403; API code=10000; message="Authentication error"/,
+      );
+      assert(!error.message.includes("DO-NOT-LOG"));
+      assert(!error.message.includes("private-account"));
+      assert.equal(error.cause, undefined);
+      return true;
+    },
+  );
+  assert.deepEqual(h.events, ["guard"]);
+});
+
+for (const stage of [
+  "before-audit-upload",
+  "before-app-upload",
+  "during-audit-upload",
+  "during-app-upload",
+  "before-activation",
+  "between-activations",
+]) {
+  test(`concurrent version at ${stage} blocks the next mutation`, async () => {
+    const h = harness();
+    const reads = {};
+    const fetchImpl = async (url, init) => {
+      const response = await h.fetchImpl(url, init);
+      const data = await response.json();
+      const worker = WORKERS.find((target) =>
+        new URL(url).pathname.endsWith(`/scripts/${target}/versions`),
+      );
+      if (worker) {
+        reads[worker] = (reads[worker] ?? 0) + 1;
+        const race =
+          (stage === "before-audit-upload" &&
+            worker === WORKERS[0] &&
+            reads[worker] === 2) ||
+          (stage === "before-app-upload" &&
+            worker === WORKERS[1] &&
+            reads[worker] === 2) ||
+          (stage === "during-audit-upload" &&
+            worker === WORKERS[0] &&
+            reads[worker] === 3) ||
+          (stage === "during-app-upload" &&
+            worker === WORKERS[1] &&
+            reads[worker] === 3) ||
+          (stage === "before-activation" && h.events.includes("upload:1")) ||
+          (stage === "between-activations" && h.events.includes("activate:0"));
+        if (race) {
+          const index = stage.startsWith("during-") ? 1 : 0;
+          data.result.items.splice(index, 0, {
+            id: "55555555-5555-4555-8555-555555555555",
+          });
+        }
+      }
+      return { ok: true, json: async () => data };
+    };
+    await assert.rejects(
+      run({ mode: "deploy", env, now, exec: h.exec, fetchImpl }),
+      /pending version|lineage changed/,
+    );
+    assert(!h.events.includes("activate:1"));
+    assert.equal(
+      h.events.includes("activate:0"),
+      stage === "between-activations",
+    );
+    if (stage === "before-audit-upload") assert(!h.events.includes("upload:0"));
+    if (["before-app-upload", "during-audit-upload"].includes(stage))
+      assert(!h.events.includes("upload:1"));
+  });
+}
 
 test("offline snapshots cannot deploy and checked-in infrastructure baseline matches", async () => {
   await assert.rejects(

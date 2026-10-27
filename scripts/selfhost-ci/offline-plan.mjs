@@ -49,6 +49,10 @@ try {
       (binding) => binding.type !== "assets",
     );
     assert.deepEqual(inherited, config.unsafe.bindings);
+    assert(
+      inherited.every((binding) => binding.version_id === "latest"),
+      "Stable versions upload accepts only latest as an inherit source",
+    );
     assert(metadata.keep_bindings.includes("secret_text"));
     for (const forbidden of [
       "routes",
@@ -64,7 +68,7 @@ try {
       "Sibling Worker chunks must be included",
     );
     console.log(
-      `${worker}: real Wrangler multipart validated, ${inherited.length} pinned inherit bindings; no infrastructure/migration declarations`,
+      `${worker}: real Wrangler multipart validated, ${inherited.length} latest inherit bindings; no infrastructure/migration declarations`,
     );
   }
 } finally {
