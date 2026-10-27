@@ -34,7 +34,7 @@ test("newest deployment alone is active; split, pending and mismatched versions 
   assert.throws(() => activeId(snapshot.deployments), /100%/);
 });
 
-test("all runtime bindings inherit from pinned active UUID without values or provisioning declarations", () => {
+test("stable version upload inherits latest without values or provisioning declarations", () => {
   const snapshot = fixtureSnapshot();
   for (const worker of WORKERS) {
     const active = validateSnapshot(snapshot[worker], worker);
@@ -43,7 +43,7 @@ test("all runtime bindings inherit from pinned active UUID without values or pro
       config.unsafe.bindings,
       active.resources.bindings
         .filter((b) => b.type !== "assets")
-        .map((b) => ({ name: b.name, type: "inherit", version_id: active.id })),
+        .map((b) => ({ name: b.name, type: "inherit", version_id: "latest" })),
     );
     for (const key of [
       "routes",
@@ -131,6 +131,7 @@ function harness({ changeActive = false, readbackMismatch = false } = {}) {
   const events = [];
   const current = Object.fromEntries(WORKERS.map((w, i) => [w, SOURCE_IDS[i]]));
   let uploads = 0;
+  const staged = {};
   const exec = async (command, args, options) => {
     if (command === "git") {
       events.push("guard");
@@ -147,6 +148,7 @@ function harness({ changeActive = false, readbackMismatch = false } = {}) {
     const index = WORKERS.indexOf(config.name);
     assert(index >= 0);
     uploads++;
+    staged[config.name] = UPLOAD_IDS[index];
     events.push(`upload:${index}`);
     await writeFile(
       options.env.WRANGLER_OUTPUT_FILE_PATH,
@@ -186,7 +188,10 @@ function harness({ changeActive = false, readbackMismatch = false } = {}) {
         ],
       };
     } else if (collection === "versions")
-      result = { items: snapshots[worker].versions };
+      result = { items: [
+        ...(staged[worker] ? [{ id: staged[worker] }] : []),
+        ...snapshots[worker].versions,
+      ] };
     else if (collection === `versions/${SOURCE_IDS[index]}`)
       result = snapshots[worker].active;
     else assert.fail(`Unexpected endpoint ${collection}`);
@@ -239,13 +244,19 @@ test("failed Wrangler upload reports safe API details and never activates either
       stderr: `[ERROR] A request to the Cloudflare API (${path}) failed.\n  Authentication error [code: 10000]\nDO-NOT-LOG`,
     });
   };
-  await assert.rejects(run({ mode: "deploy", env, now, fetchImpl: h.fetchImpl, exec }), (error) => {
-    assert.match(error.message, /HTTP=403; API code=10000; message="Authentication error"/);
-    assert(!error.message.includes("DO-NOT-LOG"));
-    assert(!error.message.includes("private-account"));
-    assert.equal(error.cause, undefined);
-    return true;
-  });
+  await assert.rejects(
+    run({ mode: "deploy", env, now, fetchImpl: h.fetchImpl, exec }),
+    (error) => {
+      assert.match(
+        error.message,
+        /HTTP=403; API code=10000; message="Authentication error"/,
+      );
+      assert(!error.message.includes("DO-NOT-LOG"));
+      assert(!error.message.includes("private-account"));
+      assert.equal(error.cause, undefined);
+      return true;
+    },
+  );
   assert.deepEqual(h.events, ["guard"]);
 });
 
