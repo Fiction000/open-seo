@@ -137,6 +137,54 @@ function candidateRequest(
 }
 
 describe("Worker gateway routing boundary", () => {
+  it.each([
+    ["cf-access-client-id", "service-client"],
+    ["cf-access-client-secret", "service-secret"],
+    ["cf-access-jwt-assertion", serviceTokenHint()],
+  ])(
+    "allows service-token GET health checks through to the app with %s",
+    async (header, value) => {
+      const response = await fetchWorker(
+        new Request("https://seo.katot.dev/api/health", {
+          headers: { [header]: value },
+        }),
+      );
+      expect(response.status).toBe(200);
+      expect(await response.text()).toBe("app");
+      expect(transportSpy).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    ["GET", "https://seo.katot.dev/"],
+    ["GET", "https://seo.katot.dev/api/health/"],
+    ["GET", "https://seo.katot.dev/api/health/extra"],
+    ["GET", "https://seo.katot.dev/api/healthcheck"],
+    ["GET", "https://seo.katot.dev/api/%68ealth"],
+    ["GET", "http://seo.katot.dev/api/health"],
+    ["GET", "https://seo.katot.dev:8443/api/health"],
+    ["GET", "https://old-worker.example/api/health"],
+    ["HEAD", "https://seo.katot.dev/api/health"],
+    ["POST", "https://seo.katot.dev/api/health"],
+    ["PUT", "https://seo.katot.dev/api/health"],
+    ["PATCH", "https://seo.katot.dev/api/health"],
+    ["DELETE", "https://seo.katot.dev/api/health"],
+    ["OPTIONS", "https://seo.katot.dev/api/health"],
+  ])("rejects service-token health lookalikes: %s %s", async (method, url) => {
+    const response = await fetchWorker(
+      new Request(url, {
+        method,
+        headers: {
+          "cf-access-client-id": "service-client",
+          "x-forwarded-host": "seo.katot.dev",
+          "x-forwarded-proto": "https",
+        },
+      }),
+    );
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: "forbidden" });
+  });
+
   it("blocks machine candidates before early handlers, including path and origin lookalikes", async () => {
     const early = await fetchWorker(
       candidateRequest("https://seo.katot.dev/api/ai-visibility/download"),

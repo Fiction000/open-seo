@@ -11,7 +11,8 @@ export async function checkProduction({
     throw new Error("Production verification requires both Access credentials");
   let response;
   try {
-    response = await fetchImpl("https://seo.katot.dev/", {
+    response = await fetchImpl("https://seo.katot.dev/api/health", {
+      method: "GET",
       redirect: "manual",
       signal: AbortSignal.timeout(30000),
       headers: { "CF-Access-Client-Id": id, "CF-Access-Client-Secret": secret },
@@ -21,12 +22,44 @@ export async function checkProduction({
       "Production verification request failed (details suppressed)",
     );
   }
-  await response.body?.cancel();
-  if (response.status !== 200)
+  const rawRay = response.headers.get("cf-ray") ?? "";
+  const ray =
+    /^[a-f0-9]{16}-[a-z]{3}$/i.test(rawRay) &&
+    ![id, secret].some((value) => rawRay.includes(value))
+      ? rawRay
+      : "unavailable";
+  const mediaType = response.headers
+    .get("content-type")
+    ?.split(";")[0]
+    .trim()
+    .toLowerCase();
+  const contentType = ["application/json", "text/html", "text/plain"].includes(
+    mediaType,
+  )
+    ? mediaType
+    : "other-or-missing";
+  let bodyKind = "unreadable";
+  let payload;
+  try {
+    const body = await response.text();
+    try {
+      payload = JSON.parse(body);
+      bodyKind = payload?.error === "forbidden" ? "app-forbidden" : "json";
+    } catch {
+      bodyKind = /cloudflare access|cloudflareaccess\.com/i.test(body)
+        ? "access-page"
+        : contentType === "text/html"
+          ? "html-page"
+          : "other";
+    }
+  } catch {
+    // Body errors can contain request credentials, so only emit a fixed label.
+  }
+  if (response.status !== 200 || payload?.status !== "ok")
     throw new Error(
-      `Production verification expected HTTP 200, got ${response.status}; redirects are not followed`,
+      `Production verification expected HTTP 200 with JSON status "ok"; status=${response.status}; cf-ray=${ray}; content-type=${contentType}; body=${bodyKind}; redirects are not followed`,
     );
-  return "https://seo.katot.dev/: HTTP 200 without redirects";
+  return "https://seo.katot.dev/api/health: HTTP 200, status ok without redirects";
 }
 
 if (

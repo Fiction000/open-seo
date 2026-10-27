@@ -168,10 +168,15 @@ function handleFetch(
   const requestPathname = requestUrl.pathname;
   const authMode = getAuthMode(env.AUTH_MODE);
   const gatewayTarget = isMcpGatewayRequestTarget(request);
+  const healthCheckTarget =
+    request.method === "GET" &&
+    requestUrl.origin === "https://seo.katot.dev" &&
+    requestPathname === "/api/health";
   if (
     authMode === "cloudflare_access" &&
     isMcpGatewayCandidate(request, env) &&
-    !gatewayTarget
+    !gatewayTarget &&
+    !healthCheckTarget
   ) {
     return Response.json({ error: "forbidden" }, { status: 403 });
   }
