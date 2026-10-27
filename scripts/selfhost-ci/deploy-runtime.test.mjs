@@ -228,6 +228,27 @@ test("manual deployment race prevents activation and failed readback prevents ap
   assert(!mismatch.events.includes("activate:1"));
 });
 
+test("failed Wrangler upload reports safe API details and never activates either Worker", async () => {
+  const h = harness();
+  const exec = async (command, args, options) => {
+    if (command === "git") return h.exec(command, args, options);
+    const path = "/accounts/private-account/workers/services/private-worker";
+    throw Object.assign(new Error("DO-NOT-LOG binding values"), {
+      code: 1,
+      stdout: `-- START CF API REQUEST: GET https://api.cloudflare.com/client/v4${path}\n-- START CF API RESPONSE: Forbidden 403\n`,
+      stderr: `[ERROR] A request to the Cloudflare API (${path}) failed.\n  Authentication error [code: 10000]\nDO-NOT-LOG`,
+    });
+  };
+  await assert.rejects(run({ mode: "deploy", env, now, fetchImpl: h.fetchImpl, exec }), (error) => {
+    assert.match(error.message, /HTTP=403; API code=10000; message="Authentication error"/);
+    assert(!error.message.includes("DO-NOT-LOG"));
+    assert(!error.message.includes("private-account"));
+    assert.equal(error.cause, undefined);
+    return true;
+  });
+  assert.deepEqual(h.events, ["guard"]);
+});
+
 test("offline snapshots cannot deploy and checked-in infrastructure baseline matches", async () => {
   await assert.rejects(
     run({ mode: "deploy", snapshotFile: "irrelevant" }),
