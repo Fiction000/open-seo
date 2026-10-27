@@ -237,6 +237,41 @@ test("one 30-second deadline covers requests, body reads and waits", async (t) =
   assert.equal(calls, 1);
 });
 
+test("the shared deadline aborts a pending request or body read without retry", async (t) => {
+  for (const phase of ["request", "body"]) {
+    const controller = new AbortController();
+    const timeout = t.mock.method(AbortSignal, "timeout", (ms) => {
+      assert.equal(ms, 30000);
+      return controller.signal;
+    });
+    let calls = 0;
+    const pending = checkProduction({
+      env,
+      ...quiet,
+      sleepImpl: async () => assert.fail("must not wait"),
+      fetchImpl: async (url, { signal }) => {
+        calls++;
+        const read = () =>
+          new Promise((resolve, reject) => {
+            signal.addEventListener("abort", () => reject(signal.reason), {
+              once: true,
+            });
+            controller.abort(new Error("synthetic-secret"));
+          });
+        if (phase === "request") return read();
+        return { status: 503, headers: new Headers(), text: read };
+      },
+    });
+    await assert.rejects(pending, (error) => {
+      assertSafe(error.message);
+      assert.match(error.message, /Production verification/);
+      return true;
+    });
+    assert.equal(calls, 1);
+    timeout.mock.restore();
+  }
+});
+
 test("requires both Access credentials before a request", async () => {
   for (const credentials of [
     {},
