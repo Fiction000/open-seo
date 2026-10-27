@@ -111,7 +111,7 @@ export function makeWranglerConfig(worker, active) {
         .map((binding) => ({
           name: binding.name,
           type: "inherit",
-          version_id: active.id,
+          version_id: "latest",
         })),
     },
   };
@@ -211,6 +211,14 @@ export async function snapshotWorker(api, worker) {
   return { deployments, versions, active };
 }
 
+async function verifyUploadSource(api, worker, sourceId, uploadedId) {
+  const { items } = await api("GET", worker, "versions");
+  assert(
+    items?.[0]?.id === uploadedId && items?.[1]?.id === sourceId,
+    `${worker}: upload lineage changed; review pending versions before activation`,
+  );
+}
+
 export async function guard({ env, exec, now }) {
   assert(
     SHA.test(env.CANDIDATE_SHA ?? ""),
@@ -273,7 +281,15 @@ export async function run({
         path,
         JSON.stringify(makeWranglerConfig(worker, snapshots[worker].active)),
       );
-      if (mode === "deploy") await guard({ env, exec, now });
+      if (mode === "deploy") {
+        const current = await snapshotWorker(api, worker);
+        validateSnapshot(current, worker);
+        assert(
+          current.active.id === snapshots[worker].active.id,
+          `${worker}: upload source changed`,
+        );
+        await guard({ env, exec, now });
+      }
       try {
         await exec(
           "pnpm",
@@ -316,24 +332,35 @@ export async function run({
           UUID.test(uploads[worker] ?? ""),
           `${worker}: missing Wrangler version ID`,
         );
+        await verifyUploadSource(
+          api,
+          worker,
+          snapshots[worker].active.id,
+          uploads[worker],
+        );
       }
     }
     if (mode === "plan")
       return "Plan passed for both Worker bundles (no remote writes)";
     // Upload both first, then activate audit before app. This is not atomic.
+    const activated = new Set();
     for (const worker of WORKERS) {
-      const current = await api("GET", worker, "deployments");
-      assert(
-        activeId(current.deployments, worker) === snapshots[worker].active.id,
-        `${worker}: concurrent active-version change`,
-      );
-    }
-    for (const worker of WORKERS) {
-      const current = await api("GET", worker, "deployments");
-      assert(
-        activeId(current.deployments, worker) === snapshots[worker].active.id,
-        `${worker}: concurrent active-version change`,
-      );
+      for (const target of WORKERS) {
+        await verifyUploadSource(
+          api,
+          target,
+          snapshots[target].active.id,
+          uploads[target],
+        );
+        const current = await api("GET", target, "deployments");
+        assert(
+          activeId(current.deployments, target) ===
+            (activated.has(target)
+              ? uploads[target]
+              : snapshots[target].active.id),
+          `${target}: concurrent active-version change`,
+        );
+      }
       await guard({ env, exec, now });
       await api("POST", worker, "deployments", {
         strategy: "percentage",
@@ -344,6 +371,7 @@ export async function run({
         activeId(readback.deployments, worker) === uploads[worker],
         `${worker}: deployment readback mismatch`,
       );
+      activated.add(worker);
       console.log(`${worker}: deployed version ${uploads[worker]}`);
     }
     return "Both Worker deployments read back successfully";

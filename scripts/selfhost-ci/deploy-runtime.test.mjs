@@ -188,10 +188,12 @@ function harness({ changeActive = false, readbackMismatch = false } = {}) {
         ],
       };
     } else if (collection === "versions")
-      result = { items: [
-        ...(staged[worker] ? [{ id: staged[worker] }] : []),
-        ...snapshots[worker].versions,
-      ] };
+      result = {
+        items: [
+          ...(staged[worker] ? [{ id: staged[worker] }] : []),
+          ...snapshots[worker].versions,
+        ],
+      };
     else if (collection === `versions/${SOURCE_IDS[index]}`)
       result = snapshots[worker].active;
     else assert.fail(`Unexpected endpoint ${collection}`);
@@ -259,6 +261,64 @@ test("failed Wrangler upload reports safe API details and never activates either
   );
   assert.deepEqual(h.events, ["guard"]);
 });
+
+for (const stage of [
+  "before-audit-upload",
+  "before-app-upload",
+  "during-audit-upload",
+  "during-app-upload",
+  "before-activation",
+  "between-activations",
+]) {
+  test(`concurrent version at ${stage} blocks the next mutation`, async () => {
+    const h = harness();
+    const reads = {};
+    const fetchImpl = async (url, init) => {
+      const response = await h.fetchImpl(url, init);
+      const data = await response.json();
+      const worker = WORKERS.find((target) =>
+        new URL(url).pathname.endsWith(`/scripts/${target}/versions`),
+      );
+      if (worker) {
+        reads[worker] = (reads[worker] ?? 0) + 1;
+        const race =
+          (stage === "before-audit-upload" &&
+            worker === WORKERS[0] &&
+            reads[worker] === 2) ||
+          (stage === "before-app-upload" &&
+            worker === WORKERS[1] &&
+            reads[worker] === 2) ||
+          (stage === "during-audit-upload" &&
+            worker === WORKERS[0] &&
+            reads[worker] === 3) ||
+          (stage === "during-app-upload" &&
+            worker === WORKERS[1] &&
+            reads[worker] === 3) ||
+          (stage === "before-activation" && h.events.includes("upload:1")) ||
+          (stage === "between-activations" && h.events.includes("activate:0"));
+        if (race) {
+          const index = stage.startsWith("during-") ? 1 : 0;
+          data.result.items.splice(index, 0, {
+            id: "55555555-5555-4555-8555-555555555555",
+          });
+        }
+      }
+      return { ok: true, json: async () => data };
+    };
+    await assert.rejects(
+      run({ mode: "deploy", env, now, exec: h.exec, fetchImpl }),
+      /pending version|lineage changed/,
+    );
+    assert(!h.events.includes("activate:1"));
+    assert.equal(
+      h.events.includes("activate:0"),
+      stage === "between-activations",
+    );
+    if (stage === "before-audit-upload") assert(!h.events.includes("upload:0"));
+    if (["before-app-upload", "during-audit-upload"].includes(stage))
+      assert(!h.events.includes("upload:1"));
+  });
+}
 
 test("offline snapshots cannot deploy and checked-in infrastructure baseline matches", async () => {
   await assert.rejects(

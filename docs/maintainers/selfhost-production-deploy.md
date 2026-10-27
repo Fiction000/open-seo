@@ -14,7 +14,11 @@ deploy job は `open-seo-selfhost-production` concurrency group で直列化し�
 
 対象は既存の `open-seo-selfhost-audit` と `open-seo-selfhost` のコードと static assets。Alchemy は CI で実行しない。state-store の認証値、暗号化パスワード、`.env.selfhost` の複製は不要。
 
-各 Worker の Deployment API から100%稼働中の version を取得し、未反映の新しい version がないことを確認する。その version の全 bindings を、名前と `type: inherit`、`version_id` だけで引き継ぐ。`ASSETS` は新しいビルドへ差し替え、既存 selfhost の `runWorkerFirst` 設定を再利用する。
+各 Worker の Deployment API から100%稼働中の version を取得し、最新の upload version と一致することを確認する。各 upload の直前にも両者が元の UUID と一致するか調べる。bindings は名前と `type: inherit`、`version_id: "latest"` で引き継ぐ。`ASSETS` は新しいビルドへ差し替え、既存 selfhost の `runWorkerFirst` 設定を再利用する。
+
+安定版の script/version upload API は、inherit の `version_id` に `"latest"` だけを受け付ける。UUID を指定するとエラー `10057` になる。特定 UUID からの継承は beta Workers API の仕様であり、この経路では使わない。根拠は Cloudflare の [Inherit binding errors](https://developers.cloudflare.com/workers/observability/errors/#inherit-binding-errors-10057)。
+
+各 upload の直後と、各 Worker を稼働版へ切り替える直前に、version 履歴の先頭が今回の upload UUID、その直前が元の UUID であることを確認する。切替前には両 Worker の稼働 UUID も再確認する。不一致なら切替を止め、pending version を自動削除・再試行しない。外部の更新をロックする仕組みはなく、読取りと更新の間の競合までは排除できない。CI と手動の更新を重ねない。
 
 `DATAFORSEO_API_KEY`、`BETTER_AUTH_SECRET`、`OPENROUTER_API_KEY` などの secret、`TEAM_DOMAIN`、`POLICY_AUD`、`MCP_GATEWAY_*` などの vars と、D1/KV/R2/DO/Workflow/service/browser bindings を既存 version から引き継ぐ。値は config やログへ書かない。AUTH_MODE は `cloudflare_access` を要求し、クライアントも同じ mode で build する。任意の integration を新たに有効にする操作は含めない。
 
@@ -24,7 +28,7 @@ Wrangler `4.151.0` の `versions upload` で2つの version を先に作り、De
 
 生成する Wrangler config は元の `wrangler.jsonc` を読み込まず、`routes`、custom domain、Access、cron、D1 migration、DO migration、Workflow provisioning の宣言を持たない。`wrangler deploy` や `triggers deploy` も使わない。
 
-Wrangler の upload 経路は、assets upload session と Worker version upload を扱う。固定した `4.151.0` の `versionsUpload` は `POST /workers/scripts/.../versions?bindings_inherit=strict` を使用し、route/domain/Access の同期は行わない。`unsafe.bindings` から生成される実 multipart で、全 inherit binding の `version_id` が残ることを `offline-plan.mjs` が検査する。
+Wrangler の upload 経路は、assets upload session と Worker version upload を扱う。固定した `4.151.0` の `versionsUpload` は `POST /workers/scripts/.../versions?bindings_inherit=strict` を使用し、route/domain/Access の同期は行わない。`unsafe.bindings` から生成される実 multipart で、全 inherit binding が `version_id: "latest"` を使うことを `offline-plan.mjs` が検査する。
 
 helper 自身の API wrapper は、対象2 Workerの deployments/versions の GET と deployments の POST だけを許可する。この allowlist は Wrangler 内部の全 HTTP を監視するものではないため、Wrangler の固定版の実装検査と、domain/routes/Access 書込み権限のない専用 token を組み合わせる。
 
@@ -52,6 +56,12 @@ Worker の実際の名前は `open-seo-selfhost` と `open-seo-selfhost-audit`�
 Access token を用いた root GET がアプリの認証条件も満たすかは、資格情報準備後に read-only で確認する。Service Auth の設定だけで root の200を保証した扱いにしない。owner 用 Allow policy は維持する。
 
 ## 本番確認と失敗時
+
+Wrangler が失敗した場合は、終了コード、主エラーの HTTP status、Cloudflare API code を出す。API message は固定の許可リストと完全一致する一般的な文だけを出し、それ以外は伏せる。API path、account ID、binding 名・値、任意の stdout/stderr は出さない。主エラーの後に Wrangler が行う認証確認のエラーは、主エラーと混ぜない。形式が一致しなければ数値も `unknown` にする。
+
+診断用の debug 出力は子プロセスのメモリ内だけで受け取り、Wrangler のログファイル保存とエラーレポート送信を無効にする。生ログを artifact に添付しない。権限不足を示すエラーが出ても、資格情報や権限を自動変更しない。
+
+初回の [run 40423307136](https://github.com/Fiction000/open-seo/actions/runs/40423307136) は audit の upload で失敗した。旧 helper が出力を破棄したため、その run の HTTP status と API code は未確認。旧コードが全 inherit binding に UUID を指定していた契約違反は特定できている。権限不足との断定や、Account Settings / User Details / D1 権限の追加は行わない。本番での修正確認はマージ後の実行で別途行う。
 
 反映後に `https://seo.katot.dev/` を Access service token のヘッダー付きで GET する。redirect は追わず、HTTP 200 だけを成功とする。ログイン画面への302、403、5xx、通信エラーは失敗。レスポンス本文と資格情報はログに出さない。
 
