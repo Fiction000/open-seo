@@ -138,14 +138,16 @@ function candidateRequest(
 
 describe("Worker gateway routing boundary", () => {
   it.each([
-    { "cf-access-client-id": "service-client" },
-    { "cf-access-client-secret": "service-secret" },
-    { "cf-access-jwt-assertion": serviceTokenHint() },
+    ["cf-access-client-id", "service-client"],
+    ["cf-access-client-secret", "service-secret"],
+    ["cf-access-jwt-assertion", serviceTokenHint()],
   ])(
-    "allows service-token GET health checks through to the app with %j",
-    async (headers) => {
+    "allows service-token GET health checks through to the app with %s",
+    async (header, value) => {
       const response = await fetchWorker(
-        new Request("https://seo.katot.dev/api/health", { headers }),
+        new Request("https://seo.katot.dev/api/health", {
+          headers: { [header]: value },
+        }),
       );
       expect(response.status).toBe(200);
       expect(await response.text()).toBe("app");

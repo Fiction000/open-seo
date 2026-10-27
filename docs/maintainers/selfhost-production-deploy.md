@@ -63,7 +63,7 @@ Wrangler が失敗した場合は、終了コード、主エラーの HTTP statu
 
 初回の [run 40423307136](https://github.com/Fiction000/open-seo/actions/runs/40423307136) は audit の upload で失敗した。旧 helper が出力を破棄したため、その run の HTTP status と API code は未確認。旧コードが全 inherit binding に UUID を指定していた契約違反は特定できている。権限不足との断定や、Account Settings / User Details / D1 権限の追加は行わない。本番での修正確認はマージ後の実行で別途行う。
 
-反映後に `https://seo.katot.dev/` を Access service token のヘッダー付きで GET する。redirect は追わず、HTTP 200 だけを成功とする。ログイン画面への302、403、5xx、通信エラーは失敗。レスポンス本文と資格情報はログに出さない。
+反映後に `https://seo.katot.dev/api/health` を Access service token のヘッダー付きで GET する。redirect は追わず、HTTP 200 かつ JSON の `status` が `"ok"` の場合だけ成功とする。ログイン画面への302、403、5xx、通信エラーや異常な health JSON は失敗。失敗時は status、形式を制限した cf-ray と content-type、本文の分類だけを出す。レスポンス本文、リクエストヘッダーと資格情報はログに出さない。
 
 2 Worker の切替は非 atomic。audit 成功後の app 失敗や、反映後の本番確認失敗に対する自動 rollback は実装しない。upload だけ成功して止まると pending version が残り、次回は自動で先へ進まない。状態を読取り、たつひこさんへ報告して、手動解決の OK を待つ。
 
