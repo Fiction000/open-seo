@@ -5,6 +5,10 @@ import { fileURLToPath } from "node:url";
 import { execFile as execFileCb } from "node:child_process";
 import { promisify } from "node:util";
 import { decideDeployWindow } from "./deploy-window.mjs";
+import {
+  wranglerDiagnosticEnv,
+  wranglerFailure,
+} from "./wrangler-diagnostics.mjs";
 import { makeWorkerAssets } from "../../deploy/alchemy/alchemy.assets.ts";
 
 // Commands use execFile argument arrays, never a shell.
@@ -286,18 +290,18 @@ export async function run({
           ],
           {
             cwd: ROOT,
-            env: {
+            env: wranglerDiagnosticEnv({
               ...env,
               WRANGLER_SEND_METRICS: "false",
               WRANGLER_OUTPUT_FILE_PATH: output,
               WRANGLER_LOG_PATH: join(directory, "wrangler.log"),
-            },
+            }),
             maxBuffer: 16 * 1024 * 1024,
           },
         );
-      } catch {
+      } catch (error) {
         throw new Error(
-          `${worker}: Wrangler ${mode} failed; output suppressed to protect bindings`,
+          `${worker}: Wrangler ${mode} failed; ${wranglerFailure(error)}; raw output suppressed to protect bindings`,
         );
       }
       if (mode === "deploy") {
