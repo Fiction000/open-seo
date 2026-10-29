@@ -332,15 +332,28 @@ export async function handlePersonalAutomationMcpRequest(
     const exactTarget =
       rawUrl === "https://seo.katot.dev/mcp/personal" ||
       rawUrl.startsWith("https://seo.katot.dev/mcp/personal?");
-    if (!exactTarget || url.origin !== "https://seo.katot.dev" || url.pathname !== PERSONAL_MCP_PATH || request.method !== "POST") {
+    if (
+      !exactTarget ||
+      url.origin !== "https://seo.katot.dev" ||
+      url.pathname !== PERSONAL_MCP_PATH ||
+      request.method !== "POST"
+    ) {
       return Response.json({ error: "forbidden" }, { status: 403 });
     }
     const identity = await resolvePersonalAutomationIdentity(request, env);
     if (!(await AuthRepository.organizationExists(identity.organizationId))) {
       return Response.json({ error: "forbidden" }, { status: 403 });
     }
-    const props = createWorkersOAuthMcpProps({ ...identity, baseUrl: url.origin });
-    return await createRequestHandler(props, false, undefined, PERSONAL_MCP_PATH)(request, env, ctx);
+    const props = createWorkersOAuthMcpProps({
+      ...identity,
+      baseUrl: url.origin,
+    });
+    return await createRequestHandler(
+      props,
+      false,
+      undefined,
+      PERSONAL_MCP_PATH,
+    )(request, env, ctx);
   } catch (error) {
     return personalMcpHttpError(error);
   }

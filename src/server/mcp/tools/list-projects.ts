@@ -74,7 +74,9 @@ export const listProjectsTool = {
         ? auth.principal.projectIds
         : undefined;
     const projects = personalProjectIds
-      ? visibleProjects.filter((project) => personalProjectIds.includes(project.id))
+      ? visibleProjects.filter((project) =>
+          personalProjectIds.includes(project.id),
+        )
       : visibleProjects;
     const lines =
       projects.length === 0

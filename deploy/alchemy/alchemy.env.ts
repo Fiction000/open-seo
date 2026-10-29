@@ -39,7 +39,9 @@ export const makeMcpPersonalEnv = (stage: string) =>
         MCP_PERSONAL_ENABLED: optionalVar("MCP_PERSONAL_ENABLED"),
         MCP_PERSONAL_AUD: optionalVar("MCP_PERSONAL_AUD"),
         MCP_PERSONAL_CLIENT_ID: optionalVar("MCP_PERSONAL_CLIENT_ID"),
-        MCP_PERSONAL_ORGANIZATION_ID: optionalVar("MCP_PERSONAL_ORGANIZATION_ID"),
+        MCP_PERSONAL_ORGANIZATION_ID: optionalVar(
+          "MCP_PERSONAL_ORGANIZATION_ID",
+        ),
         MCP_PERSONAL_PROJECT_IDS: optionalVar("MCP_PERSONAL_PROJECT_IDS"),
       }
     : {

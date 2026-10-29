@@ -179,15 +179,13 @@ function handleFetch(
     request.method === "GET" &&
     requestUrl.origin === "https://seo.katot.dev" &&
     requestPathname === "/api/health";
-  if (
-    isPersonalAutomationCandidate(request, env) &&
-    !personalTarget
-  ) {
+  if (isPersonalAutomationCandidate(request, env) && !personalTarget) {
     return Response.json({ error: "forbidden" }, { status: 403 });
   }
   if (personalTarget) {
-    return import("@/server/mcp/transport").then(({ handlePersonalAutomationMcpRequest }) =>
-      handlePersonalAutomationMcpRequest(request, env, ctx),
+    return import("@/server/mcp/transport").then(
+      ({ handlePersonalAutomationMcpRequest }) =>
+        handlePersonalAutomationMcpRequest(request, env, ctx),
     );
   }
   if (

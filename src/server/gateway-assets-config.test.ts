@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { makeWorkerAssets } from "../../deploy/alchemy/alchemy.assets";
-import { makeMcpGatewayEnv, makeMcpPersonalEnv } from "../../deploy/alchemy/alchemy.env";
+import {
+  makeMcpGatewayEnv,
+  makeMcpPersonalEnv,
+} from "../../deploy/alchemy/alchemy.env";
 
 describe("gateway static asset routing", () => {
   it("runs only bounded self-host asset paths through the Worker", () => {
