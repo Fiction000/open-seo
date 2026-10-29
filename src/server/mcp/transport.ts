@@ -28,6 +28,11 @@ import { createOpenSeoMcpServer } from "@/server/mcp/server";
 import { supportsMcpApps } from "@/server/mcp/ui-capabilities";
 import { AuthRepository } from "@/server/auth/repositories/AuthRepository";
 import { resolveExistingActiveHostedOrganization } from "@/server/auth/default-hosted-organization";
+import {
+  PERSONAL_MCP_PATH,
+  personalMcpHttpError,
+  resolvePersonalAutomationIdentity,
+} from "@/server/mcp/personal-auth";
 
 // Mirrors the agents SDK's DEFAULT_CORS_OPTIONS so legacy responses carry the
 // same CORS surface as the modern handler's.
@@ -136,11 +141,12 @@ function createRequestHandler(
   props: McpProps,
   supportsApps: boolean,
   allowedOriginHostnames?: string[],
+  route = MCP_ROUTE,
 ) {
   const modernHandler = createMcpHandler(
     () => createOpenSeoMcpServer(props, supportsApps),
     {
-      route: MCP_ROUTE,
+      route,
       allowedOriginHostnames,
       legacy: "reject",
       // MCP serving is strictly stateless: no notification is ever published,
@@ -156,7 +162,7 @@ function createRequestHandler(
     if (request.method === "OPTIONS") {
       return new Response(null, { headers: MCP_CORS_HEADERS });
     }
-    if (new URL(request.url).pathname !== MCP_ROUTE) {
+    if (new URL(request.url).pathname !== route) {
       return withMcpCors(new Response("Not Found", { status: 404 }));
     }
     if (!(await isLegacyRequest(request))) {
@@ -312,5 +318,43 @@ export async function handleSelfHostedOpenSeoMcpRequest(
       );
     }
     return gatewayHttpError(error);
+  }
+}
+
+export async function handlePersonalAutomationMcpRequest(
+  request: Request,
+  env: unknown,
+  ctx: ExecutionContext,
+): Promise<Response> {
+  try {
+    const rawUrl = request.url;
+    const url = new URL(rawUrl);
+    const exactTarget =
+      rawUrl === "https://seo.katot.dev/mcp/personal" ||
+      rawUrl.startsWith("https://seo.katot.dev/mcp/personal?");
+    if (
+      !exactTarget ||
+      url.origin !== "https://seo.katot.dev" ||
+      url.pathname !== PERSONAL_MCP_PATH ||
+      request.method !== "POST"
+    ) {
+      return Response.json({ error: "forbidden" }, { status: 403 });
+    }
+    const identity = await resolvePersonalAutomationIdentity(request, env);
+    if (!(await AuthRepository.organizationExists(identity.organizationId))) {
+      return Response.json({ error: "forbidden" }, { status: 403 });
+    }
+    const props = createWorkersOAuthMcpProps({
+      ...identity,
+      baseUrl: url.origin,
+    });
+    return await createRequestHandler(
+      props,
+      false,
+      undefined,
+      PERSONAL_MCP_PATH,
+    )(request, env, ctx);
+  } catch (error) {
+    return personalMcpHttpError(error);
   }
 }

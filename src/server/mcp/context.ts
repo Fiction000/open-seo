@@ -6,7 +6,15 @@ import { buildDashboardUrl } from "@/server/mcp/urls";
 
 export type ToolPrincipal =
   | { kind: "human" }
-  | { kind: "machine"; service: "litellm-openseo"; commonName: string };
+  | { kind: "machine"; service: "litellm-openseo"; commonName: string }
+  | PersonalAutomationPrincipal;
+
+export type PersonalAutomationPrincipal = {
+  kind: "personal-automation";
+  service: "openseo-personal-automation";
+  commonName: string;
+  projectIds: readonly [string, string];
+};
 
 export const MCP_GATEWAY_ALLOWED_TOOLS = [
   "whoami",
@@ -70,6 +78,12 @@ const principalSchema = z.discriminatedUnion("kind", [
     kind: z.literal("machine"),
     service: z.literal("litellm-openseo"),
     commonName: z.string().min(1),
+  }),
+  z.object({
+    kind: z.literal("personal-automation"),
+    service: z.literal("openseo-personal-automation"),
+    commonName: z.string().min(1),
+    projectIds: z.tuple([z.string().uuid(), z.string().uuid()]).readonly(),
   }),
 ]);
 

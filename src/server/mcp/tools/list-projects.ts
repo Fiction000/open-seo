@@ -68,7 +68,16 @@ export const listProjectsTool = {
   },
   handler: async (_args: Record<string, never>, context: ToolContext) => {
     const { baseUrl, ...auth } = context.auth;
-    const projects = await listVisibleProjects(auth);
+    const visibleProjects = await listVisibleProjects(auth);
+    const personalProjectIds =
+      auth.principal.kind === "personal-automation"
+        ? auth.principal.projectIds
+        : undefined;
+    const projects = personalProjectIds
+      ? visibleProjects.filter((project) =>
+          personalProjectIds.includes(project.id),
+        )
+      : visibleProjects;
     const lines =
       projects.length === 0
         ? [
@@ -96,5 +105,14 @@ export const listProjectsTool = {
         })),
       },
     });
+  },
+};
+
+export const personalListProjectsTool = {
+  ...listProjectsTool,
+  config: {
+    ...listProjectsTool.config,
+    description:
+      "Lists only the two server-configured personal projects available on this automation-only lane. Uses no credits.",
   },
 };

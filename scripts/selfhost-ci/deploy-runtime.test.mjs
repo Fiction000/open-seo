@@ -9,6 +9,7 @@ import {
   createApi,
   guard,
   run,
+  assertBaseline,
   verifyBaseline,
 } from "./deploy-runtime.mjs";
 import { fixtureSnapshot, SOURCE_IDS, UPLOAD_IDS } from "./fixtures.mjs";
@@ -326,4 +327,15 @@ test("offline snapshots cannot deploy and checked-in infrastructure baseline mat
     /plan-only/,
   );
   await verifyBaseline();
+});
+
+test("baseline guard rejects a changed infrastructure fingerprint", () => {
+  const reviewed =
+    "9e52b6afbe2119e2287f0dcb6da5aa87252e083b8a9f6d03d13154876d2ca0cd";
+  const changed =
+    "a420340085c322a1d56dd10b85aaba746bd586cac1547fa695cbbf7ec25a1a6f";
+  assert.throws(
+    () => assertBaseline(changed, reviewed),
+    /Infrastructure\/schema changed: manually reconcile\/migrate and review baseline before deployment/,
+  );
 });

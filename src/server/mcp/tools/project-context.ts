@@ -11,6 +11,7 @@ import { projectIdSchema } from "@/server/mcp/schemas";
 import {
   updateProjectContextSchema,
   type ContextAuthor,
+  type ProjectContextUpdate,
 } from "@/types/schemas/projectContext";
 
 // Both tools return the whole context, so they share one output shape. Every
@@ -128,3 +129,78 @@ export function buildUpdateProjectContextTool(author: ContextAuthor) {
 }
 
 export const updateProjectContextTool = buildUpdateProjectContextTool("mcp");
+
+const nonBlankText = (max: number) => z.string().trim().min(1).max(max);
+const personalUpdateSchema = z.union([
+  z.strictObject({
+    section: z.enum([
+      "business_overview",
+      "current_goal",
+      "positioning",
+      "writing_preferences",
+    ]),
+    content: nonBlankText(4000),
+  }),
+  z.strictObject({
+    customSection: z
+      .string()
+      .trim()
+      .min(1)
+      .max(60)
+      .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+    title: nonBlankText(120),
+    content: nonBlankText(4000),
+  }),
+  z.strictObject({
+    addCompetitors: z
+      .array(
+        z.strictObject({
+          domain: nonBlankText(255),
+          name: nonBlankText(120).optional(),
+          notes: nonBlankText(500).optional(),
+        }),
+      )
+      .min(1)
+      .max(100),
+  }),
+  z.strictObject({
+    addKeyPages: z
+      .array(
+        z.strictObject({
+          url: nonBlankText(2048),
+          role: z.enum(["hub", "spoke", "money", "other"]).optional(),
+          topic: nonBlankText(200).optional(),
+          notes: nonBlankText(500).optional(),
+        }),
+      )
+      .min(1)
+      .max(100),
+  }),
+]);
+const personalUpdateInputSchema = z.strictObject({
+  projectId: projectIdSchema,
+  updates: z.array(personalUpdateSchema).min(1).max(50),
+});
+
+export const personalUpdateProjectContextTool = {
+  ...updateProjectContextTool,
+  config: {
+    ...updateProjectContextTool.config,
+    description:
+      "Non-destructively upserts non-empty standard/custom sections, competitors, or key pages for one of the two configured personal projects. Empty values, deletes, removals, research-log changes, and report-template changes are not available.",
+    inputSchema: personalUpdateInputSchema.shape,
+    annotations: {
+      readOnlyHint: false,
+      openWorldHint: false,
+      destructiveHint: false,
+    },
+  },
+  handler: async (
+    args: z.infer<typeof personalUpdateInputSchema>,
+    context: Parameters<typeof updateProjectContextTool.handler>[1],
+  ) =>
+    updateProjectContextTool.handler(
+      args as { projectId: string; updates: ProjectContextUpdate[] },
+      context,
+    ),
+};

@@ -13,6 +13,13 @@ async function requireProjectAccess(
 ) {
   const { baseUrl, ...auth } = toolContext.auth;
 
+  if (
+    auth.principal.kind === "personal-automation" &&
+    !auth.principal.projectIds.includes(projectId)
+  ) {
+    throw new AppError("FORBIDDEN");
+  }
+
   // User-scoped credentials have no org binding: derive the org from the
   // project row, then authorize via the caller's membership in that org. The
   // returned auth is rebound to the project's org + the member's role there,
