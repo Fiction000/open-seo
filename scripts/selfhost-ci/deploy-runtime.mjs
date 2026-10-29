@@ -30,6 +30,13 @@ function assert(ok, message) {
   if (!ok) throw new Error(message);
 }
 
+export function assertBaseline(actual, expected) {
+  assert(
+    actual === expected,
+    "Infrastructure/schema changed: manually reconcile/migrate and review baseline before deployment",
+  );
+}
+
 export function activeId(deployments, worker) {
   // History is newest first. Only its head is active.
   const versions = deployments?.[0]?.versions;
@@ -157,10 +164,7 @@ export async function verifyBaseline() {
   const expected = JSON.parse(
     await readFile(new URL("./baseline.json", import.meta.url), "utf8"),
   ).sha256;
-  assert(
-    (await fingerprint()) === expected,
-    "Infrastructure/schema changed: manually reconcile/migrate and review baseline before deployment",
-  );
+  assertBaseline(await fingerprint(), expected);
 }
 
 export function createApi({ accountId, token, fetchImpl = fetch }) {
