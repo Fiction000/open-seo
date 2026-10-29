@@ -67,3 +67,30 @@ export const whoamiTool = {
     });
   },
 };
+
+export const personalWhoamiTool = {
+  ...whoamiTool,
+  config: {
+    ...whoamiTool.config,
+    description:
+      "Identifies this self-hosted personal automation principal. Does not query or initialize billing.",
+    annotations: {
+      readOnlyHint: true,
+      idempotentHint: true,
+      openWorldHint: false,
+      destructiveHint: false,
+    },
+  },
+  handler: async (_args: Record<string, never>, context: ToolContext) => {
+    const auth = context.auth;
+    return mcpResponse({
+      text: `Account: ${auth.userEmail}\nMode: self-hosted\nScopes: ${auth.scopes.join(", ") || "none"}`,
+      structuredContent: {
+        userEmail: auth.userEmail,
+        scopes: auth.scopes,
+        mode: "self-hosted" as const,
+        creditsRemaining: null,
+      },
+    });
+  },
+};
