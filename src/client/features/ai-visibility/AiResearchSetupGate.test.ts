@@ -1,4 +1,5 @@
 import React from "react";
+import { jsx } from "react/jsx-runtime";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
@@ -87,11 +88,11 @@ function page(
     React.createElement(
       QueryClientProvider,
       { client },
-      React.createElement(AiResearchSetupGate, {
+      jsx(AiResearchSetupGate, {
         projectId,
         allowConfiguredTracker,
         children: React.createElement("main", null, "Prompt Tracking"),
-      }),
+      } satisfies React.ComponentProps<typeof AiResearchSetupGate>),
     ),
   );
 }

@@ -53,7 +53,7 @@ export function AiResearchSetupGate({
     allowConfiguredTracker && !pathname.endsWith("/research");
   const setupOptions = aiResearchSetupQueryOptions(projectId);
   const setup = useQuery(setupOptions);
-  const tracker = useQuery({
+  const trackerState = useQuery({
     ...aiTrackerQueryOptions(projectId),
     enabled: trackingRoute,
   });
@@ -148,17 +148,18 @@ export function AiResearchSetupGate({
       />
     );
   if (status === "ready" && !finishing) return children;
-  if (trackingRoute && tracker.isPending) return <SkeletonPageContent />;
-  if (trackingRoute && tracker.isError)
+  if (trackingRoute && trackerState.isPending) return <SkeletonPageContent />;
+  if (trackingRoute && trackerState.isError)
     return (
       <AiQueryError
-        error={tracker.error}
+        error={trackerState.error}
         retry={() => {
-          void tracker.refetch();
+          void trackerState.refetch();
         }}
       />
     );
-  if (trackingRoute && tracker.data?.configured && !finishing) return children;
+  if (trackingRoute && trackerState.data?.configured && !finishing)
+    return children;
   if (setup.data.review)
     return (
       <div className="grid min-h-[calc(100dvh-8rem)] place-items-center">
