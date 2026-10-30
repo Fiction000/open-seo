@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { useRouterState } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Sparkles } from "lucide-react";
 import { Alert, AlertDescription } from "@/client/components/ui/alert";
@@ -27,23 +28,35 @@ import {
 } from "./shared";
 
 /**
- * AI visibility needs research keywords. A project with a website but no
- * keywords confirms the spend here, then the server runs setup once: website
- * research and the onboarding competitor review when the overview or
- * competitors are missing, otherwise one keyword and prompt generation. The
- * run lives on the server, so leaving or reloading the page finds it again.
- * Both paths end on the page that started setup.
+ * Prompt Research and Prompt Explorer need research keywords. Prompt Tracking
+ * can use an existing tracker. A project with a website but no keywords
+ * confirms the spend here, then the server runs setup once: website research
+ * and the onboarding competitor review when the overview or competitors are
+ * missing, otherwise one keyword and prompt generation. The run lives on the
+ * server, so leaving or reloading the page finds it again. Both paths end on
+ * the page that started setup.
  */
 export function AiResearchSetupGate({
   projectId,
+  allowConfiguredTracker = false,
   children,
 }: {
   projectId: string;
+  allowConfiguredTracker?: boolean;
   children: ReactNode;
 }) {
   const queryClient = useQueryClient();
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
+  });
+  const trackingRoute =
+    allowConfiguredTracker && !pathname.endsWith("/research");
   const setupOptions = aiResearchSetupQueryOptions(projectId);
   const setup = useQuery(setupOptions);
+  const tracker = useQuery({
+    ...aiTrackerQueryOptions(projectId),
+    enabled: trackingRoute,
+  });
   const refresh = () =>
     Promise.all([
       queryClient.invalidateQueries({ queryKey: aiVisibilityKey(projectId) }),
@@ -135,6 +148,17 @@ export function AiResearchSetupGate({
       />
     );
   if (status === "ready" && !finishing) return children;
+  if (trackingRoute && tracker.isPending) return <SkeletonPageContent />;
+  if (trackingRoute && tracker.isError)
+    return (
+      <AiQueryError
+        error={tracker.error}
+        retry={() => {
+          void tracker.refetch();
+        }}
+      />
+    );
+  if (trackingRoute && tracker.data?.configured && !finishing) return children;
   if (setup.data.review)
     return (
       <div className="grid min-h-[calc(100dvh-8rem)] place-items-center">
