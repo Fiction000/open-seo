@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import re
 import unittest
 from html.parser import HTMLParser
 from pathlib import Path
@@ -46,7 +47,9 @@ class CopyParser(HTMLParser):
 class OAuthInfoContractTests(unittest.TestCase):
     def test_worker_config_is_isolated_static_assets_only(self) -> None:
         raw = (ROOT / "deploy/oauth-info/wrangler.jsonc").read_text()
-        config = json.loads("\n".join(line for line in raw.splitlines() if not line.lstrip().startswith("//")))
+        uncommented = "\n".join(line for line in raw.splitlines() if not line.lstrip().startswith("//"))
+        json_text = re.sub(r'("(?:[^"\\]|\\.)*")|,\s*(?=[}\]])', lambda token: token.group(1) or "", uncommented)
+        config = json.loads(json_text)
         self.assertEqual(config["name"], "open-seo-selfhost-info")
         self.assertEqual(config["compatibility_date"], "2026-10-31")
         self.assertIs(config["workers_dev"], True)

@@ -1,34 +1,102 @@
 {
   "home": [
-    {"kind": "p", "text": "OpenSEO Selfhost", "href": null},
-    {"kind": "h1", "text": "自分のサイトの検索とアクセスを確認する。", "href": null},
-    {"kind": "p", "text": "OpenSEO Selfhost は、運営者が管理するサイトの検索パフォーマンスとアクセス状況を確認するための、個人用の OpenSEO 環境です。", "href": null},
-    {"kind": "p", "text": "Google Search Console と Google Analytics 4 を読み取り専用で接続し、選択したプロパティのレポートを表示します。接続先のデータを書き換える権限は求めません。", "href": null},
-    {"kind": "p", "text": "このページはアプリの用途とデータの取り扱いを説明する公開ページです。アプリ本体の利用にはアクセス認証が必要です。", "href": null},
-    {"kind": "link", "text": "アプリを開く", "href": "https://seo.katot.dev/"},
-    {"kind": "link", "text": "プライバシーポリシー", "href": "/privacy/"},
-    {"kind": "link", "text": "お問い合わせ", "href": "mailto:katot.vita@gmail.com"}
+    { "kind": "p", "text": "OpenSEO Selfhost", "href": null },
+    {
+      "kind": "h1",
+      "text": "自分のサイトの検索とアクセスを確認する。",
+      "href": null
+    },
+    {
+      "kind": "p",
+      "text": "OpenSEO Selfhost は、運営者が管理するサイトの検索パフォーマンスとアクセス状況を確認するための、個人用の OpenSEO 環境です。",
+      "href": null
+    },
+    {
+      "kind": "p",
+      "text": "Google Search Console と Google Analytics 4 を読み取り専用で接続し、選択したプロパティのレポートを表示します。接続先のデータを書き換える権限は求めません。",
+      "href": null
+    },
+    {
+      "kind": "p",
+      "text": "このページはアプリの用途とデータの取り扱いを説明する公開ページです。アプリ本体の利用にはアクセス認証が必要です。",
+      "href": null
+    },
+    {
+      "kind": "link",
+      "text": "アプリを開く",
+      "href": "https://seo.katot.dev/"
+    },
+    { "kind": "link", "text": "プライバシーポリシー", "href": "/privacy/" },
+    {
+      "kind": "link",
+      "text": "お問い合わせ",
+      "href": "mailto:katot.vita@gmail.com"
+    }
   ],
   "privacy": [
-    {"kind": "p", "text": "OpenSEO Selfhost", "href": null},
-    {"kind": "h1", "text": "プライバシーポリシー", "href": null},
-    {"kind": "p", "text": "更新日：2026年10月31日", "href": null},
-    {"kind": "p", "text": "このポリシーは、seo.katot.dev で運営する個人用の OpenSEO Selfhost と、この公開案内ページに適用します。OpenSEO 公式のホステッドサービスとは別の環境です。", "href": null},
-    {"kind": "h2", "text": "Google から取得する情報", "href": null},
-    {"kind": "p", "text": "Google 接続では、アカウントを識別するための基本プロフィール情報と、Search Console または Analytics の読み取り専用権限を求めます。利用者がアクセスできるプロパティの一覧と、接続したプロパティのレポートデータを取得します。Google 側のサイト設定や計測データを書き換える権限は求めません。", "href": null},
-    {"kind": "p", "text": "Search Console では検索語句、ページ、クリック数、表示回数、クリック率、掲載順位などを、Analytics ではセッションなどのアクセス指標を読み取ります。", "href": null},
-    {"kind": "h2", "text": "利用と保存", "href": null},
-    {"kind": "p", "text": "取得した情報は、接続するアカウントとプロパティの選択、レポートの表示、利用者が要求した分析に使います。接続を維持するための認証トークン、アカウント識別情報、接続先プロパティの情報をアプリのデータベースに保存します。Search Console のレポート結果はキャッシュする場合があります。", "href": null},
-    {"kind": "p", "text": "利用者が MCP 対応の外部クライアントからレポートを要求した場合、その結果を当該クライアントへ返します。AI アシスタントを含む外部クライアントでの保存・処理は、そのサービスの設定とポリシーも確認してください。", "href": null},
-    {"kind": "h2", "text": "接続の解除", "href": null},
-    {"kind": "p", "text": "アプリの接続設定から、プロジェクトの Google 接続を解除できます。この操作では、そのプロジェクトの接続情報を削除します。Google アカウントをアプリから削除する操作では、該当するアカウント・サービスの認証情報と、その認証情報を使う各プロジェクトの接続情報を削除します。Google 側のアプリへの許可の取り消しは、同じ Google アカウントの別の接続が残っていない場合に試みます。取り消しに失敗することもあります。", "href": null},
-    {"kind": "p", "text": "Google 側の許可は、Google アカウントの「サードパーティとの接続」からも取り消せます。接続解除と、レポート・バックアップを含む保存済み情報の全面的な削除は同一ではありません。保存済み情報の削除については、運営者へお問い合わせください。", "href": null},
-    {"kind": "link", "text": "Google アカウントの接続を管理", "href": "https://myaccount.google.com/connections"},
-    {"kind": "h2", "text": "公開ページについて", "href": null},
-    {"kind": "p", "text": "この案内ページには、Google のレポートデータや認証トークンを表示しません。公開ページとアプリ本体は Cloudflare の基盤を利用します。", "href": null},
-    {"kind": "h2", "text": "お問い合わせ", "href": null},
-    {"kind": "p", "text": "この個人用環境のデータの取り扱いや削除については、運営者へご連絡ください。", "href": null},
-    {"kind": "link", "text": "katot.vita@gmail.com", "href": "mailto:katot.vita@gmail.com"},
-    {"kind": "link", "text": "ホームに戻る", "href": "/"}
+    { "kind": "p", "text": "OpenSEO Selfhost", "href": null },
+    { "kind": "h1", "text": "プライバシーポリシー", "href": null },
+    { "kind": "p", "text": "更新日：2026年10月31日", "href": null },
+    {
+      "kind": "p",
+      "text": "このポリシーは、seo.katot.dev で運営する個人用の OpenSEO Selfhost と、この公開案内ページに適用します。OpenSEO 公式のホステッドサービスとは別の環境です。",
+      "href": null
+    },
+    { "kind": "h2", "text": "Google から取得する情報", "href": null },
+    {
+      "kind": "p",
+      "text": "Google 接続では、アカウントを識別するための基本プロフィール情報と、Search Console または Analytics の読み取り専用権限を求めます。利用者がアクセスできるプロパティの一覧と、接続したプロパティのレポートデータを取得します。Google 側のサイト設定や計測データを書き換える権限は求めません。",
+      "href": null
+    },
+    {
+      "kind": "p",
+      "text": "Search Console では検索語句、ページ、クリック数、表示回数、クリック率、掲載順位などを、Analytics ではセッションなどのアクセス指標を読み取ります。",
+      "href": null
+    },
+    { "kind": "h2", "text": "利用と保存", "href": null },
+    {
+      "kind": "p",
+      "text": "取得した情報は、接続するアカウントとプロパティの選択、レポートの表示、利用者が要求した分析に使います。接続を維持するための認証トークン、アカウント識別情報、接続先プロパティの情報をアプリのデータベースに保存します。Search Console のレポート結果はキャッシュする場合があります。",
+      "href": null
+    },
+    {
+      "kind": "p",
+      "text": "利用者が MCP 対応の外部クライアントからレポートを要求した場合、その結果を当該クライアントへ返します。AI アシスタントを含む外部クライアントでの保存・処理は、そのサービスの設定とポリシーも確認してください。",
+      "href": null
+    },
+    { "kind": "h2", "text": "接続の解除", "href": null },
+    {
+      "kind": "p",
+      "text": "アプリの接続設定から、プロジェクトの Google 接続を解除できます。この操作では、そのプロジェクトの接続情報を削除します。Google アカウントをアプリから削除する操作では、該当するアカウント・サービスの認証情報と、その認証情報を使う各プロジェクトの接続情報を削除します。Google 側のアプリへの許可の取り消しは、同じ Google アカウントの別の接続が残っていない場合に試みます。取り消しに失敗することもあります。",
+      "href": null
+    },
+    {
+      "kind": "p",
+      "text": "Google 側の許可は、Google アカウントの「サードパーティとの接続」からも取り消せます。接続解除と、レポート・バックアップを含む保存済み情報の全面的な削除は同一ではありません。保存済み情報の削除については、運営者へお問い合わせください。",
+      "href": null
+    },
+    {
+      "kind": "link",
+      "text": "Google アカウントの接続を管理",
+      "href": "https://myaccount.google.com/connections"
+    },
+    { "kind": "h2", "text": "公開ページについて", "href": null },
+    {
+      "kind": "p",
+      "text": "この案内ページには、Google のレポートデータや認証トークンを表示しません。公開ページとアプリ本体は Cloudflare の基盤を利用します。",
+      "href": null
+    },
+    { "kind": "h2", "text": "お問い合わせ", "href": null },
+    {
+      "kind": "p",
+      "text": "この個人用環境のデータの取り扱いや削除については、運営者へご連絡ください。",
+      "href": null
+    },
+    {
+      "kind": "link",
+      "text": "katot.vita@gmail.com",
+      "href": "mailto:katot.vita@gmail.com"
+    },
+    { "kind": "link", "text": "ホームに戻る", "href": "/" }
   ]
 }
