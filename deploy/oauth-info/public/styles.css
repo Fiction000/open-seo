@@ -1,0 +1,129 @@
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  color-scheme: light;
+  font-family: "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+  color: #172438;
+  background: #fcfcfa;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  line-height: 1.875;
+}
+
+.site-header,
+main,
+.site-footer {
+  width: min(720px, calc(100% - 48px));
+  margin-inline: auto;
+}
+
+.site-header {
+  padding-top: 48px;
+  padding-bottom: 48px;
+}
+
+.brand {
+  margin: 0;
+  font-size: 16px;
+  line-height: 30px;
+}
+
+main {
+  padding-bottom: 48px;
+}
+
+h1 {
+  margin: 0 0 24px;
+  font-size: 32px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+h2 {
+  margin: 0 0 24px;
+  font-size: 20px;
+  font-weight: 400;
+  line-height: 1.6;
+}
+
+p {
+  margin: 0 0 24px;
+}
+
+.copy > p:last-child,
+.copy section > p:last-child {
+  margin-bottom: 0;
+}
+
+.copy section {
+  margin-top: 24px;
+}
+
+.copy section h2 {
+  margin-bottom: 24px;
+}
+
+.updated {
+  margin-bottom: 24px;
+}
+
+a {
+  color: #1f4d8c;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+}
+
+a:hover {
+  text-decoration-thickness: 2px;
+}
+
+a:focus-visible {
+  border-radius: 2px;
+  outline: 3px solid #1f4d8c;
+  outline-offset: 4px;
+}
+
+.primary-link {
+  margin: 24px 0 0;
+}
+
+.primary-link a {
+  display: inline-block;
+  padding: 4px 0;
+}
+
+.site-footer {
+  padding-top: 40px;
+  padding-bottom: 48px;
+  border-top: 1px solid #d9dedf;
+}
+
+.site-footer nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 24px;
+}
+
+@media (max-width: 600px) {
+  .site-header,
+  main,
+  .site-footer {
+    width: calc(100% - 48px);
+  }
+
+  .site-header {
+    padding-top: 32px;
+    padding-bottom: 40px;
+  }
+
+  h1 {
+    font-size: 28px;
+  }
+}
