@@ -44,6 +44,7 @@ import { getDomainOverviewTool } from "@/server/mcp/tools/get-domain-overview";
 import { getDomainHistoryTool } from "@/server/mcp/tools/get-domain-history";
 import { addRankTrackingKeywordsTool } from "@/server/mcp/tools/add-rank-tracking-keywords";
 import { createRankTrackerTool } from "@/server/mcp/tools/create-rank-tracker";
+import { registerGatewayOnlyTools } from "@/server/mcp/tools/gateway-only-tools";
 import { estimateRankTrackerCostTool } from "@/server/mcp/tools/estimate-rank-tracker-cost";
 import { getRankTrackerTool } from "@/server/mcp/tools/get-rank-tracker";
 import { removeRankTrackingKeywordsTool } from "@/server/mcp/tools/remove-rank-tracking-keywords";
@@ -322,9 +323,8 @@ export function createOpenSeoMcpServer(
     if (
       isMachinePrincipal &&
       !MCP_GATEWAY_ALLOWED_TOOLS.some((name) => name === tool.name)
-    ) {
+    )
       return;
-    }
     registerOpenSeoTool(server, tool, authProps, supportsClientApps);
   };
 
@@ -410,6 +410,7 @@ export function createOpenSeoMcpServer(
   register(getGoogleAnalyticsEcommercePerformanceTool);
   register(getGoogleAnalyticsSiteSearchTool);
   register(getGoogleAnalyticsAudienceBreakdownTool);
+  if (isMachinePrincipal) registerGatewayOnlyTools(register);
   register(runSiteAuditTool);
   register(listSiteAuditsTool);
   register(deleteSiteAuditTool);
