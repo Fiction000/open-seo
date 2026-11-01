@@ -31,6 +31,8 @@ export const MCP_GATEWAY_ALLOWED_TOOLS = [
   "get_google_analytics_site_search",
   "get_google_analytics_audience_breakdown",
   "get_google_analytics_measurement_health",
+  "get_dataforseo_balance",
+  "create_gateway_rank_tracker",
 ] as const;
 
 export type ToolAuthContext = {
