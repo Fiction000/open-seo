@@ -459,7 +459,7 @@ describe("OpenSEO shared-workspace MCP database integration", () => {
         result: z.object({ tools: z.array(z.object({ name: z.string() })) }),
       })
       .parse(await listed.json());
-    expect(listing.result.tools).toHaveLength(14);
+    expect(listing.result.tools).toHaveLength(16);
     expect(new Set(listing.result.tools.map((tool) => tool.name))).toEqual(
       new Set([
         "whoami",
@@ -476,6 +476,8 @@ describe("OpenSEO shared-workspace MCP database integration", () => {
         "get_google_analytics_site_search",
         "get_google_analytics_audience_breakdown",
         "get_google_analytics_measurement_health",
+        "get_dataforseo_balance",
+        "create_gateway_rank_tracker",
       ]),
     );
 

@@ -142,7 +142,7 @@ describe("OpenSEO machine MCP HTTP authentication", () => {
         result: z.object({ tools: z.array(z.object({ name: z.string() })) }),
       })
       .parse(await listed.json());
-    expect(tools.tools).toHaveLength(14);
+    expect(tools.tools).toHaveLength(16);
     expect(tools.tools).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ name: "list_projects" }),
