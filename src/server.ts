@@ -28,6 +28,10 @@ import {
   PERSONAL_MCP_PATH,
   isPersonalAutomationCandidate,
 } from "@/server/mcp/personal-auth";
+import {
+  GROWTH_MCP_PATH,
+  isGrowthAutomationCandidate,
+} from "@/server/mcp/growth-auth";
 import { withPgClient } from "@/db";
 import {
   AUTUMN_WEBHOOK_PATH,
@@ -175,12 +179,24 @@ function handleFetch(
   const personalTarget =
     requestUrl.origin === `https://${MCP_GATEWAY_HOST}` &&
     requestPathname === PERSONAL_MCP_PATH;
+  const growthTarget =
+    requestUrl.origin === `https://${MCP_GATEWAY_HOST}` &&
+    requestPathname === GROWTH_MCP_PATH;
   const healthCheckTarget =
     request.method === "GET" &&
     requestUrl.origin === "https://seo.katot.dev" &&
     requestPathname === "/api/health";
   if (isPersonalAutomationCandidate(request, env) && !personalTarget) {
     return Response.json({ error: "forbidden" }, { status: 403 });
+  }
+  if (isGrowthAutomationCandidate(request, env) && !growthTarget) {
+    return Response.json({ error: "forbidden" }, { status: 403 });
+  }
+  if (growthTarget) {
+    return import("@/server/mcp/transport").then(
+      ({ handleGrowthAutomationMcpRequest }) =>
+        handleGrowthAutomationMcpRequest(request, env, ctx),
+    );
   }
   if (personalTarget) {
     return import("@/server/mcp/transport").then(

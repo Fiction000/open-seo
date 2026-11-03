@@ -52,6 +52,23 @@ export const makeMcpPersonalEnv = (stage: string) =>
         MCP_PERSONAL_PROJECT_IDS: "",
       };
 
+export const makeMcpGrowthEnv = (stage: string) =>
+  stage === "selfhost"
+    ? {
+        MCP_GROWTH_ENABLED: optionalVar("MCP_GROWTH_ENABLED"),
+        MCP_GROWTH_AUD: optionalVar("MCP_GROWTH_AUD"),
+        MCP_GROWTH_CLIENT_ID: optionalVar("MCP_GROWTH_CLIENT_ID"),
+        MCP_GROWTH_ORGANIZATION_ID: optionalVar("MCP_GROWTH_ORGANIZATION_ID"),
+        MCP_GROWTH_PROJECT_IDS: optionalVar("MCP_GROWTH_PROJECT_IDS"),
+      }
+    : {
+        MCP_GROWTH_ENABLED: "false",
+        MCP_GROWTH_AUD: "",
+        MCP_GROWTH_CLIENT_ID: "",
+        MCP_GROWTH_ORGANIZATION_ID: "",
+        MCP_GROWTH_PROJECT_IDS: "",
+      };
+
 // Secrets/vars resolve from Config (`Config.redacted` → Cloudflare
 // `secret_text`, `Config.string` → plaintext var). Previews and self-host pass
 // an `--env-file`, which the alchemy CLI loads into Config, NOT process.env;

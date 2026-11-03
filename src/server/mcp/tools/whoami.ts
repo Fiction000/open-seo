@@ -94,3 +94,12 @@ export const personalWhoamiTool = {
     });
   },
 };
+
+export const growthWhoamiTool = {
+  ...personalWhoamiTool,
+  config: {
+    ...personalWhoamiTool.config,
+    description:
+      "Identifies this self-hosted read-only growth automation principal. Does not query or initialize billing.",
+  },
+};

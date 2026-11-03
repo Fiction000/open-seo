@@ -33,6 +33,11 @@ import {
   personalMcpHttpError,
   resolvePersonalAutomationIdentity,
 } from "@/server/mcp/personal-auth";
+import {
+  GROWTH_MCP_PATH,
+  growthMcpHttpError,
+  resolveGrowthAutomationIdentity,
+} from "@/server/mcp/growth-auth";
 
 // Mirrors the agents SDK's DEFAULT_CORS_OPTIONS so legacy responses carry the
 // same CORS surface as the modern handler's.
@@ -356,5 +361,43 @@ export async function handlePersonalAutomationMcpRequest(
     )(request, env, ctx);
   } catch (error) {
     return personalMcpHttpError(error);
+  }
+}
+
+export async function handleGrowthAutomationMcpRequest(
+  request: Request,
+  env: unknown,
+  ctx: ExecutionContext,
+): Promise<Response> {
+  try {
+    const rawUrl = request.url;
+    const url = new URL(rawUrl);
+    const exactTarget =
+      rawUrl === "https://seo.katot.dev/mcp/growth" ||
+      rawUrl.startsWith("https://seo.katot.dev/mcp/growth?");
+    if (
+      !exactTarget ||
+      url.origin !== "https://seo.katot.dev" ||
+      url.pathname !== GROWTH_MCP_PATH ||
+      request.method !== "POST"
+    ) {
+      return Response.json({ error: "forbidden" }, { status: 403 });
+    }
+    const identity = await resolveGrowthAutomationIdentity(request, env);
+    if (!(await AuthRepository.organizationExists(identity.organizationId))) {
+      return Response.json({ error: "forbidden" }, { status: 403 });
+    }
+    const props = createWorkersOAuthMcpProps({
+      ...identity,
+      baseUrl: url.origin,
+    });
+    return await createRequestHandler(
+      props,
+      false,
+      undefined,
+      GROWTH_MCP_PATH,
+    )(request, env, ctx);
+  } catch (error) {
+    return growthMcpHttpError(error);
   }
 }

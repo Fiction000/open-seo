@@ -10,7 +10,7 @@ export const getDataforseoBalanceTool = {
   config: {
     title: "Get DataForSEO balance",
     description:
-      "Read the connected DataForSEO account's remaining balance in USD (and lifetime deposits) when the user asks how much credit is left. Uses no credits — it calls DataForSEO's free account endpoint. Available to the LiteLLM gateway only; returns balanceUsd: null when DataForSEO does not report one.",
+      "Read the connected DataForSEO account's remaining balance in USD (and lifetime deposits) when the user asks how much credit is left. Uses no credits — it calls DataForSEO's free account endpoint. Available to the LiteLLM gateway and the read-only growth lane only; returns balanceUsd: null when DataForSEO does not report one.",
     inputSchema: {} as Record<string, never>,
     outputSchema: z.looseObject({
       balanceUsd: z.number().nullable(),
@@ -27,7 +27,10 @@ export const getDataforseoBalanceTool = {
   handler: async (_args: Record<string, never>, context: ToolContext) => {
     // The balance belongs to the shared provider account, not to a tenant, so
     // only the gateway's machine principal may read it.
-    if (context.auth.principal.kind !== "machine") {
+    if (
+      context.auth.principal.kind !== "machine" &&
+      context.auth.principal.kind !== "growth-automation"
+    ) {
       throw new AppError("FORBIDDEN");
     }
     const userData = await fetchUserData();

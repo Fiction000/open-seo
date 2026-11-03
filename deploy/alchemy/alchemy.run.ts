@@ -10,6 +10,7 @@ import {
   makeDataEnv,
   makeMcpGatewayEnv,
   makeMcpPersonalEnv,
+  makeMcpGrowthEnv,
   optionalVar,
 } from "./alchemy.env.ts";
 import { unstable_readConfig } from "wrangler";
@@ -462,6 +463,7 @@ export default Alchemy.Stack(
         POLICY_AUD: access.policyAud,
         ...makeMcpGatewayEnv(stage),
         ...makeMcpPersonalEnv(stage),
+        ...makeMcpGrowthEnv(stage),
 
         // Service binding to the audit worker's AuditEngine entrypoint (cancel +
         // GDPR erasure of scratchpad state; env key = binding name).
