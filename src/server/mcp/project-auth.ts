@@ -14,7 +14,8 @@ async function requireProjectAccess(
   const { baseUrl, ...auth } = toolContext.auth;
 
   if (
-    auth.principal.kind === "personal-automation" &&
+    (auth.principal.kind === "personal-automation" ||
+      auth.principal.kind === "growth-automation") &&
     !auth.principal.projectIds.includes(projectId)
   ) {
     throw new AppError("FORBIDDEN");

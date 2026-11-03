@@ -3,6 +3,7 @@ import { makeWorkerAssets } from "../../deploy/alchemy/alchemy.assets";
 import {
   makeMcpGatewayEnv,
   makeMcpPersonalEnv,
+  makeMcpGrowthEnv,
 } from "../../deploy/alchemy/alchemy.env";
 
 describe("gateway static asset routing", () => {
@@ -32,6 +33,16 @@ describe("gateway static asset routing", () => {
       MCP_PERSONAL_CLIENT_ID: "",
       MCP_PERSONAL_ORGANIZATION_ID: "",
       MCP_PERSONAL_PROJECT_IDS: "",
+    });
+  });
+
+  it("keeps the growth lane disabled and unconfigured outside self-host", () => {
+    expect(makeMcpGrowthEnv("hosted-prod")).toEqual({
+      MCP_GROWTH_ENABLED: "false",
+      MCP_GROWTH_AUD: "",
+      MCP_GROWTH_CLIENT_ID: "",
+      MCP_GROWTH_ORGANIZATION_ID: "",
+      MCP_GROWTH_PROJECT_IDS: "",
     });
   });
 });

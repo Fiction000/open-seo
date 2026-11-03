@@ -7,13 +7,21 @@ import { buildDashboardUrl } from "@/server/mcp/urls";
 export type ToolPrincipal =
   | { kind: "human" }
   | { kind: "machine"; service: "litellm-openseo"; commonName: string }
-  | PersonalAutomationPrincipal;
+  | PersonalAutomationPrincipal
+  | GrowthAutomationPrincipal;
 
 export type PersonalAutomationPrincipal = {
   kind: "personal-automation";
   service: "openseo-personal-automation";
   commonName: string;
   projectIds: readonly [string, string];
+};
+
+export type GrowthAutomationPrincipal = {
+  kind: "growth-automation";
+  service: "openseo-growth-automation";
+  commonName: string;
+  projectIds: readonly string[];
 };
 
 export const MCP_GATEWAY_ALLOWED_TOOLS = [
@@ -86,6 +94,12 @@ const principalSchema = z.discriminatedUnion("kind", [
     service: z.literal("openseo-personal-automation"),
     commonName: z.string().min(1),
     projectIds: z.tuple([z.string().uuid(), z.string().uuid()]).readonly(),
+  }),
+  z.object({
+    kind: z.literal("growth-automation"),
+    service: z.literal("openseo-growth-automation"),
+    commonName: z.string().min(1),
+    projectIds: z.array(z.string().uuid()).min(1).max(10).readonly(),
   }),
 ]);
 

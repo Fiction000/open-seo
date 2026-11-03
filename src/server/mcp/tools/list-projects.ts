@@ -70,7 +70,8 @@ export const listProjectsTool = {
     const { baseUrl, ...auth } = context.auth;
     const visibleProjects = await listVisibleProjects(auth);
     const personalProjectIds =
-      auth.principal.kind === "personal-automation"
+      auth.principal.kind === "personal-automation" ||
+      auth.principal.kind === "growth-automation"
         ? auth.principal.projectIds
         : undefined;
     const projects = personalProjectIds
@@ -114,5 +115,14 @@ export const personalListProjectsTool = {
     ...listProjectsTool.config,
     description:
       "Lists only the two server-configured personal projects available on this automation-only lane. Uses no credits.",
+  },
+};
+
+export const growthListProjectsTool = {
+  ...listProjectsTool,
+  config: {
+    ...listProjectsTool.config,
+    description:
+      "Lists only the server-configured projects available on this read-only growth lane. Uses no credits.",
   },
 };
