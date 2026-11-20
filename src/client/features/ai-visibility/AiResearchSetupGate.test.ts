@@ -7,6 +7,11 @@ import { AiResearchSetupGate } from "./AiResearchSetupGate";
 import { aiResearchSetupQueryOptions, aiTrackerQueryOptions } from "./shared";
 import { startAiResearchSetup } from "@/serverFunctions/ai-visibility";
 
+vi.mock("./OpenRouterKeyGate", () => ({
+  OpenRouterKeyGate: ({ children }: { children: unknown }) => children,
+}));
+
+vi.mock("cloudflare:workers", () => ({ env: {}, waitUntil: vi.fn() }));
 let pathname = "/p/p1/ai-visibility";
 vi.mock("@tanstack/react-router", () => ({
   Link: () => null,

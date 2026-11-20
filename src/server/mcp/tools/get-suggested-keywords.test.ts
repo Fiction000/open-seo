@@ -3,6 +3,7 @@ import { KeywordSuggestionReason } from "@/shared/keyword-suggestions";
 import { getSuggestedKeywordsTool } from "./get-suggested-keywords";
 import { makeToolContext, textContent } from "./tool-test-support";
 
+vi.mock("cloudflare:workers", () => ({ env: {}, waitUntil: vi.fn() }));
 const { getProjectForOrganization, getSuggestions } = vi.hoisted(() => ({
   getProjectForOrganization: vi.fn(),
   getSuggestions: vi.fn(),

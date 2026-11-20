@@ -97,6 +97,9 @@ import {
 } from "@/server/mcp/tools/project-context";
 import { listSavedKeywordsTool } from "@/server/mcp/tools/list-saved-keywords";
 import { removeSavedKeywordsTool } from "@/server/mcp/tools/remove-saved-keywords";
+import { getSuggestedKeywordsTool } from "@/server/mcp/tools/get-suggested-keywords";
+import { getRankHistoryTool } from "@/server/mcp/tools/get-rank-history";
+import { updateAiResearchKeywordsTool } from "@/server/mcp/tools/update-ai-research-keywords";
 import {
   findSerpCompetitorsTool,
   getGoogleBusinessQuestionsTool,
@@ -132,6 +135,7 @@ import {
 } from "@/server/mcp/tools/search-console-tools";
 import {
   getAuditIssuesTool,
+  getAuditLighthouseTool,
   getAuditPagesTool,
   getAuditStatusTool,
   runSiteAuditTool,
@@ -308,10 +312,10 @@ export function registerOpenSeoTools(
   register(updateProjectContextTool);
   register(listSavedKeywordsTool);
   register(removeSavedKeywordsTool);
+  register(getSuggestedKeywordsTool);
   register(researchKeywordsTool);
   register(saveKeywordsTool);
   register(getDomainOverviewTool);
-  register(getDomainHistoryTool);
   register(getDomainKeywordSuggestionsTool);
   register(getBacklinksOverviewTool);
   register(getBacklinksProfileTool);
@@ -322,6 +326,7 @@ export function registerOpenSeoTools(
   register(generateAiVisibilityPromptsTool);
   register(researchAiVisibilityPromptsTool);
   register(completeAiResearchSetupTool);
+  register(updateAiResearchKeywordsTool);
   register(saveAiVisibilityTrackerTool);
   register(estimateAiVisibilityCostTool);
   register(setAiVisibilityScheduleTool);
@@ -334,6 +339,7 @@ export function registerOpenSeoTools(
   register(exportAiVisibilityDataTool);
   register(createRankTrackerTool);
   register(getRankTrackerTool);
+  register(getRankHistoryTool);
   register(addRankTrackingKeywordsTool);
   register(removeRankTrackingKeywordsTool);
   register(pinRankTrackingKeywordsTool);
@@ -373,6 +379,7 @@ export function registerOpenSeoTools(
   register(getAuditStatusTool);
   register(getAuditIssuesTool);
   register(getAuditPagesTool);
+  register(getAuditLighthouseTool);
   register(saveReportTool);
   register(listReportsTool);
   register(getReportTool);
@@ -491,6 +498,7 @@ export function createOpenSeoMcpServer(
   }
   register(listSavedKeywordsTool);
   register(removeSavedKeywordsTool);
+  register(getSuggestedKeywordsTool);
   register(researchKeywordsTool);
   register(saveKeywordsTool);
   register(getDomainOverviewTool);
@@ -505,6 +513,7 @@ export function createOpenSeoMcpServer(
   register(generateAiVisibilityPromptsTool);
   register(researchAiVisibilityPromptsTool);
   register(completeAiResearchSetupTool);
+  register(updateAiResearchKeywordsTool);
   register(saveAiVisibilityTrackerTool);
   register(estimateAiVisibilityCostTool);
   register(setAiVisibilityScheduleTool);
@@ -517,6 +526,7 @@ export function createOpenSeoMcpServer(
   register(exportAiVisibilityDataTool);
   register(createRankTrackerTool);
   register(getRankTrackerTool);
+  register(getRankHistoryTool);
   register(addRankTrackingKeywordsTool);
   register(removeRankTrackingKeywordsTool);
   register(pinRankTrackingKeywordsTool);
@@ -557,6 +567,7 @@ export function createOpenSeoMcpServer(
   register(getAuditStatusTool);
   register(getAuditIssuesTool);
   register(getAuditPagesTool);
+  register(getAuditLighthouseTool);
   register(saveReportTool);
   register(listReportsTool);
   register(getReportTool);

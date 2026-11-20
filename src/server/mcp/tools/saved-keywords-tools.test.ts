@@ -3,6 +3,7 @@ import { listSavedKeywordsTool } from "./list-saved-keywords";
 import { saveKeywordsTool } from "./save-keywords";
 import { makeToolContext, textContent } from "./tool-test-support";
 
+vi.mock("cloudflare:workers", () => ({ env: {}, waitUntil: vi.fn() }));
 const mocks = vi.hoisted(() => ({
   getProjectForOrganization: vi.fn(),
   getSavedKeywords: vi.fn(),

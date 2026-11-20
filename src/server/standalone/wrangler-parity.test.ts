@@ -27,8 +27,11 @@ function bindings(config: Config) {
 // The Docker edition is built from wrangler.standalone.json. A workflow or
 // object added only to wrangler.jsonc leaves its binding undefined on Docker,
 // as LOCAL_RANK_WORKFLOW was when Local SEO shipped.
-test("the Docker edition declares every workflow and object hosted has", () => {
+test("the Docker edition declares every workflow and object it implements", () => {
   const standalone = bindings(readConfig("wrangler.standalone.json"));
-  for (const binding of bindings(readConfig("wrangler.jsonc")))
+  const workerOnly = new Set(["ONBOARDING_CHAT:OnboardingChatAgent"]);
+  for (const binding of bindings(readConfig("wrangler.jsonc"))) {
+    if (workerOnly.has(binding)) continue;
     expect(standalone).toContain(binding);
+  }
 });

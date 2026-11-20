@@ -96,6 +96,12 @@ An OAuth connection or API key is tied to the workspace that was active when you
 
 See [OpenSEO MCP tools](/docs/mcp-tools) for everything your agent can do through OpenSEO MCP, and which tools use credits.
 
+## Shared machine gateway
+
+The general MCP connection above exposes the tools available to the signed-in user, including paid research and project setup. The separately operated shared machine gateway at `https://seo.katot.dev/mcp` has a smaller server-side allowlist, pinned to one shared organization. Its descriptive identity scope is `mcp:read`; authorization is enforced by the gateway's tool allowlist and pinned organization, not by OAuth scopes.
+
+The gateway is read-only apart from its capped `create_gateway_rank_tracker` action. It cannot create projects, change Google connections, run paid research or rank checks directly, run audits, or perform other mutations. Google reporting uses Google's service quotas, not OpenSEO credits.
+
 ## What to do after setup
 
 See the [AI Visibility guide](/docs/ai-visibility) for supported engines, research coverage, and costs.

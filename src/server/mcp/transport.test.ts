@@ -1,5 +1,6 @@
 import type { CreateMcpHandlerOptions } from "agents/mcp/server";
 import { McpServer } from "@modelcontextprotocol/server";
+import { z } from "zod";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createWorkersOAuthMcpProps,
@@ -28,6 +29,12 @@ vi.mock("@/server/auth/repositories/AuthRepository", () => ({
 }));
 vi.mock("@/server/auth/repositories/GuestAccountRepository", () => ({
   GuestAccountRepository: { findClaimingUser },
+}));
+vi.mock("@/server/auth/default-hosted-organization", () => ({
+  resolveActiveHostedOrganization: vi.fn(async () => ({
+    organizationId: "rebound-org",
+    role: "owner",
+  })),
 }));
 
 vi.mock("@/middleware/ensure-user/cloudflareAccess", () => ({
@@ -252,6 +259,8 @@ describe("handleAuthenticatedOpenSeoMcpRequest", () => {
       [MCP_AUTH_CONTEXT_PROP]: {
         ...props[MCP_AUTH_CONTEXT_PROP],
         role: "owner",
+        orgScope: "user",
+        userAgent: undefined,
       },
     });
   });
@@ -290,6 +299,8 @@ describe("handleAuthenticatedOpenSeoMcpRequest", () => {
       [MCP_AUTH_CONTEXT_PROP]: {
         ...props[MCP_AUTH_CONTEXT_PROP],
         role: "owner",
+        orgScope: "user",
+        userAgent: undefined,
       },
     });
   });
@@ -328,11 +339,22 @@ describe("handleAuthenticatedOpenSeoMcpRequest", () => {
       { ...ctx, props },
     );
 
-    expect(response.status).toBe(401);
-    expect(response.headers.get("WWW-Authenticate")).toBe(
-      'Bearer error="invalid_token"',
-    );
-    expect(selfHostedAuthMocks.createOpenSeoMcpServer).not.toHaveBeenCalled();
+    expect(response.status).toBe(200);
+    const reboundContext = z
+      .object({
+        [MCP_AUTH_CONTEXT_PROP]: z.looseObject({
+          organizationId: z.string(),
+          role: z.string(),
+        }),
+      })
+      .safeParse(selfHostedAuthMocks.createOpenSeoMcpServer.mock.calls[0]?.[0]);
+    expect(reboundContext.success).toBe(true);
+    if (reboundContext.success) {
+      expect(reboundContext.data[MCP_AUTH_CONTEXT_PROP]).toMatchObject({
+        organizationId: "rebound-org",
+        role: "owner",
+      });
+    }
   });
 
   // Someone signed up in the browser that connected the guest: the agent
@@ -368,6 +390,8 @@ describe("handleAuthenticatedOpenSeoMcpRequest", () => {
         userEmail: "ana@example.com",
         guestClaimToken: undefined,
         role: "owner",
+        orgScope: "user",
+        userAgent: undefined,
       },
     });
   });

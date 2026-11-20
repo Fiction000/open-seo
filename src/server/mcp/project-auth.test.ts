@@ -2,13 +2,20 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { withMcpProjectAuth } from "@/server/mcp/project-auth";
 import { makeToolContext } from "@/server/mcp/tools/tool-test-support";
 
+vi.mock("cloudflare:workers", () => ({ env: {}, waitUntil: vi.fn() }));
 const mocks = vi.hoisted(() => ({
   getProjectForOrganization: vi.fn(),
+  getProjectOrganizationId: vi.fn(),
+  getMembership: vi.fn(),
 }));
 
+vi.mock("@/server/auth/repositories/AuthRepository", () => ({
+  AuthRepository: { getMembership: mocks.getMembership },
+}));
 vi.mock("@/server/features/projects/services/ProjectService", () => ({
   ProjectService: {
     getProjectForOrganization: mocks.getProjectForOrganization,
+    getProjectOrganizationId: mocks.getProjectOrganizationId,
   },
 }));
 
@@ -17,6 +24,8 @@ const toolContext = makeToolContext();
 describe("withMcpProjectAuth", () => {
   beforeEach(() => {
     // Default: the project belongs to the org. Individual tests override.
+    mocks.getProjectOrganizationId.mockResolvedValue("org_123");
+    mocks.getMembership.mockResolvedValue({ role: "owner" });
     mocks.getProjectForOrganization.mockResolvedValue({
       id: "project_123",
       name: "Test",

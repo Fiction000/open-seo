@@ -26,6 +26,7 @@ vi.mock("@/server/mcp/instrumentation", () => ({
     _schema: unknown,
     handler: unknown,
   ) => handler,
+  instrumentMcpToolInput: (_name: string, inputSchema: unknown) => inputSchema,
 }));
 vi.mock("@/middleware/ensure-user/cloudflareAccess", () => ({
   resolveCloudflareAccessContext: vi.fn(),
@@ -76,7 +77,7 @@ beforeAll(async () => {
     .join("\n");
   await client.executeMultiple(`PRAGMA foreign_keys=ON;
     CREATE TABLE organization (id TEXT PRIMARY KEY, name TEXT NOT NULL, slug TEXT NOT NULL UNIQUE, logo TEXT, created_at INTEGER NOT NULL, metadata TEXT);
-    CREATE TABLE projects (id TEXT PRIMARY KEY, organization_id TEXT NOT NULL, name TEXT NOT NULL, domain TEXT, location_code INTEGER NOT NULL DEFAULT 2840, language_code TEXT NOT NULL DEFAULT 'en', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, archived_at TEXT, ai_research_keywords TEXT, indexnow_key TEXT);
+    CREATE TABLE projects (id TEXT PRIMARY KEY, organization_id TEXT NOT NULL, name TEXT NOT NULL, brand_name TEXT, domain TEXT, location_code INTEGER NOT NULL DEFAULT 2840, language_code TEXT NOT NULL DEFAULT 'en', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, archived_at TEXT, ai_research_keywords TEXT, indexnow_key TEXT);
     CREATE TABLE user (id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, email_verified INTEGER NOT NULL DEFAULT 0, image TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);
     CREATE TABLE member (id TEXT PRIMARY KEY, organization_id TEXT NOT NULL, user_id TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'member', created_at INTEGER NOT NULL);
     CREATE TRIGGER no_user_write BEFORE INSERT ON user BEGIN SELECT RAISE(ABORT, 'user writes forbidden'); END;
@@ -148,13 +149,37 @@ async function request(
       headers: {
         Accept: "application/json, text/event-stream",
         "Content-Type": "application/json",
+        ...(method === "initialize"
+          ? {}
+          : {
+              "MCP-Protocol-Version": "2026-07-28",
+              "Mcp-Method": method,
+              ...(typeof params.name === "string"
+                ? { "Mcp-Name": params.name }
+                : {}),
+            }),
         "cf-access-jwt-assertion": jwt,
         ...opts.headers,
       },
       body:
         (opts.methodHttp ?? "POST") === "GET"
           ? undefined
-          : JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+          : JSON.stringify({
+              jsonrpc: "2.0",
+              id: 1,
+              method,
+              params: {
+                ...params,
+                ...(method === "initialize"
+                  ? {}
+                  : {
+                      _meta: {
+                        "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+                        "io.modelcontextprotocol/clientCapabilities": {},
+                      },
+                    }),
+              },
+            }),
     }),
     env,
     ctx,

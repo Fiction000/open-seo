@@ -27,6 +27,7 @@ import { getPublicOrigin } from "@/server/mcp/public-origin";
 import { createOpenSeoMcpServer } from "@/server/mcp/server";
 import { supportsMcpApps } from "@/server/mcp/ui-capabilities";
 import { AuthRepository } from "@/server/auth/repositories/AuthRepository";
+import { GuestAccountRepository } from "@/server/auth/repositories/GuestAccountRepository";
 import { resolveActiveHostedOrganization } from "@/server/auth/default-hosted-organization";
 import {
   PERSONAL_MCP_PATH,
@@ -222,7 +223,18 @@ async function handleAuthenticatedOpenSeoMcpRequestImpl(
   // so the grant can outlive the membership (member removed, org changed).
   // Re-resolve per request; 401 invalid_token only once the user belongs to
   // no organization, pushing compliant clients back through OAuth.
-  const authContext = result.data[MCP_AUTH_CONTEXT_PROP];
+  const tokenAuthContext = result.data[MCP_AUTH_CONTEXT_PROP];
+  const claimedUser = tokenAuthContext.guestClaimToken
+    ? await GuestAccountRepository.findClaimingUser(tokenAuthContext.userId)
+    : null;
+  const authContext = claimedUser
+    ? {
+        ...tokenAuthContext,
+        userId: claimedUser.userId,
+        userEmail: claimedUser.email,
+        guestClaimToken: undefined,
+      }
+    : tokenAuthContext;
   const organization = await resolveRequestOrganization(
     authContext.userId,
     authContext.organizationId,

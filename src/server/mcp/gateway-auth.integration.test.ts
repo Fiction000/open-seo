@@ -27,6 +27,7 @@ vi.mock("@/server/mcp/instrumentation", () => ({
     _schema: unknown,
     handler: unknown,
   ) => handler,
+  instrumentMcpToolInput: (_name: string, inputSchema: unknown) => inputSchema,
 }));
 vi.mock("@/middleware/ensure-user/cloudflareAccess", () => ({
   resolveCloudflareAccessContext: vi.fn(),
@@ -123,6 +124,7 @@ beforeAll(async () => {
       id TEXT PRIMARY KEY,
       organization_id TEXT NOT NULL REFERENCES organization(id),
       name TEXT NOT NULL,
+      brand_name TEXT,
       domain TEXT,
       location_code INTEGER NOT NULL DEFAULT 2840,
       language_code TEXT NOT NULL DEFAULT 'en',
@@ -263,6 +265,7 @@ async function handle(
     headers: {
       Accept: "application/json, text/event-stream",
       "Content-Type": "application/json",
+      ...(modern ? { "MCP-Protocol-Version": "2026-07-28" } : {}),
       "cf-access-jwt-assertion": await accessToken(),
       ...(modern
         ? {
@@ -365,7 +368,15 @@ describe("OpenSEO shared-workspace MCP database integration", () => {
           .object({
             result: z.object({
               isError: z.boolean().optional(),
-              structuredContent: z.record(z.string(), z.unknown()),
+              content: z
+                .array(
+                  z.object({
+                    type: z.string(),
+                    text: z.string().optional(),
+                  }),
+                )
+                .optional(),
+              structuredContent: z.record(z.string(), z.unknown()).optional(),
             }),
           })
           .parse(await response.json());
@@ -373,7 +384,18 @@ describe("OpenSEO shared-workspace MCP database integration", () => {
           body.result?.isError,
           `${name}: ${JSON.stringify(body.result)}`,
         ).not.toBe(true);
-        const content = body.result.structuredContent;
+        const content =
+          body.result.structuredContent ??
+          (() => {
+            const text = body.result.content?.find(
+              (part) => part.type === "text",
+            )?.text;
+            if (!text) return {};
+            const parsed = z
+              .record(z.string(), z.unknown())
+              .safeParse(JSON.parse(text));
+            return parsed.success ? parsed.data : {};
+          })();
         expect(content.status === "ok" || content.ok === true).toBe(true);
         expect(service).toHaveBeenCalledTimes(1);
         if (service === Ga4ReportingService.runReport) {
