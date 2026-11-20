@@ -46,7 +46,6 @@ const authContext: ToolAuthContext = {
   userEmail: "user@example.com",
   organizationId: "org-1",
   role: "owner",
-  orgScope: "pinned",
   clientId: "client-1",
   scopes: ["mcp"],
   baseUrl: "https://app.openseo.so",
@@ -109,6 +108,19 @@ describe("instrumentMcpToolHandler", () => {
     );
   });
 
+  it("gives a paid-plan refusal the same billing link, after the tool's own message", async () => {
+    const wrapped = instrumentMcpToolHandler("demo", outputSchema, async () => {
+      throw new AppError(
+        "PAYMENT_REQUIRED",
+        "Upgrade to the paid plan to use Prompt Explorer",
+      );
+    });
+
+    await expect(wrapped({}, toolContext)).rejects.toThrow(
+      "Upgrade to the paid plan to use Prompt Explorer. Retrying won't help. The organization owner can manage the plan at https://app.openseo.so/billing",
+    );
+  });
+
   it("captures a usage event and the activation milestone for a successful external call", async () => {
     const wrapped = instrumentMcpToolHandler("demo", outputSchema, async () =>
       okResult({ items: [{ domain: "example.com" }] }),
@@ -134,7 +146,7 @@ describe("instrumentMcpToolHandler", () => {
       },
     });
     expect(mocks.recordExternalMcpToolCall).toHaveBeenCalledExactlyOnceWith(
-      "org-1",
+      authContext,
     );
   });
 

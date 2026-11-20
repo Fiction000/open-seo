@@ -284,6 +284,11 @@ async function hasPendingInvitationForEmail(email: string) {
   return pending !== undefined;
 }
 
+async function hasAnyUser() {
+  const [first] = await db.select({ id: authUser.id }).from(authUser).limit(1);
+  return first !== undefined;
+}
+
 async function getLastActiveOrganizationId(userId: string) {
   const record = await db.query.user.findFirst({
     columns: { lastActiveOrganizationId: true },
@@ -315,6 +320,10 @@ async function isAnalyticsOptedOut(userId: string) {
 async function saveSignupCampaign(
   userId: string,
   campaign: {
+    entry: "mcp" | "app";
+    wasGuest: boolean;
+    agent: string | null;
+    utmMedium: string | null;
     utmSource: string | null;
     utmCampaign: string | null;
     utmContent: string | null;
@@ -363,6 +372,7 @@ export const AuthRepository = {
   organizationExists,
   getOrganizationOwner,
   hasPendingInvitationForEmail,
+  hasAnyUser,
   isAnalyticsOptedOut,
   saveSignupCampaign,
 } as const;

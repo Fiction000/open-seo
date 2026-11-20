@@ -4,6 +4,8 @@ const ERROR_CODES = [
   "UNAUTHENTICATED",
   "AUTH_CONFIG_MISSING",
   "PAYMENT_REQUIRED",
+  "PAYMENT_METHOD_REQUIRED",
+  "PAYMENT_ACTION_REQUIRED",
   "INSUFFICIENT_CREDITS",
   "FORBIDDEN",
   "NOT_FOUND",
@@ -20,6 +22,7 @@ const ERROR_CODES = [
   "DATAFORSEO_AUTH_FAILED",
   "RATE_LIMITED",
   "UPSTREAM_UNAVAILABLE",
+  "SUBREQUEST_LIMIT",
   "CONFLICT",
   "INTERNAL_ERROR",
 ] as const;
@@ -35,6 +38,10 @@ const NON_REPORTABLE_ERROR_CODES = new Set<ErrorCode>([
   "RATE_LIMITED",
   "NOT_FOUND",
   "PAYMENT_REQUIRED",
+  // The customer's own card declined, is missing, or needs their bank's
+  // confirmation; the message tells them what to do.
+  "PAYMENT_METHOD_REQUIRED",
+  "PAYMENT_ACTION_REQUIRED",
   "INSUFFICIENT_CREDITS",
   "VALIDATION_ERROR",
   "UNKNOWN_LOCATION",

@@ -20,6 +20,11 @@ import type { SelectionAnchor } from "@/client/components/table/tableSelection";
 export const RANK_TRACKING_HEADER_CLASS =
   "text-xs uppercase tracking-wide text-muted-foreground";
 
+const RIGHT_ALIGNED = {
+  headerClassName: "text-right",
+  cellClassName: "text-right tabular-nums",
+} as const;
+
 const HEADER_TOOLTIPS: Record<string, string> = {
   keyword: "The search term being tracked in Google",
   volume: "Estimated monthly search volume from Google",
@@ -50,6 +55,7 @@ function makeVolumeColumn(locationLabel?: string): ColumnDef<RankTrackingRow> {
             : HEADER_TOOLTIPS.volume
         }
         className={RANK_TRACKING_HEADER_CLASS}
+        align="right"
       />
     ),
     size: 90,
@@ -57,6 +63,7 @@ function makeVolumeColumn(locationLabel?: string): ColumnDef<RankTrackingRow> {
       <VolumeCell value={getValue<number | undefined>() ?? null} />
     ),
     sortUndefined: "last",
+    meta: RIGHT_ALIGNED,
   };
 }
 
@@ -69,6 +76,7 @@ const kdColumn: ColumnDef<RankTrackingRow> = {
       label="KD"
       title={HEADER_TOOLTIPS.kd}
       className={RANK_TRACKING_HEADER_CLASS}
+      align="right"
     />
   ),
   size: 70,
@@ -76,6 +84,7 @@ const kdColumn: ColumnDef<RankTrackingRow> = {
     <ScoreBadge value={getValue<number | undefined>() ?? null} />
   ),
   sortUndefined: "last",
+  meta: { headerClassName: "text-right", cellClassName: "text-right" },
 };
 
 const cpcColumn: ColumnDef<RankTrackingRow> = {
@@ -87,6 +96,7 @@ const cpcColumn: ColumnDef<RankTrackingRow> = {
       label="CPC"
       title={HEADER_TOOLTIPS.cpc}
       className={RANK_TRACKING_HEADER_CLASS}
+      align="right"
     />
   ),
   size: 80,
@@ -94,6 +104,7 @@ const cpcColumn: ColumnDef<RankTrackingRow> = {
     <CpcCell value={getValue<number | undefined>() ?? null} />
   ),
   sortUndefined: "last",
+  meta: RIGHT_ALIGNED,
 };
 
 // Hidden column. The table always sorts by it first, so pinned keywords stay
@@ -105,9 +116,14 @@ const pinnedColumn: ColumnDef<RankTrackingRow> = {
   accessorFn: (row) => (row.pinned ? 0 : 1),
 };
 
+type RankTrackingActions = {
+  selectAnchorRef: MutableRefObject<SelectionAnchor | null>;
+  onKeywordClick: (row: RankTrackingRow) => void;
+  onSetPinned: (vars: { trackingKeywordId: string; pinned: boolean }) => void;
+};
+
 function makeKeywordColumn(
-  onKeywordClick: (row: RankTrackingRow) => void,
-  onSetPinned: (vars: { trackingKeywordId: string; pinned: boolean }) => void,
+  actions: RankTrackingActions | undefined,
 ): ColumnDef<RankTrackingRow> {
   return {
     id: "keyword",
@@ -122,23 +138,29 @@ function makeKeywordColumn(
     ),
     cell: ({ row }) => (
       <div className="flex items-center gap-1.5">
-        <PinButton
-          pinned={row.original.pinned}
-          onClick={() =>
-            onSetPinned({
-              trackingKeywordId: row.original.trackingKeywordId,
-              pinned: !row.original.pinned,
-            })
-          }
-        />
-        <button
-          type="button"
-          className="text-left font-medium decoration-dotted underline-offset-2 hover:underline"
-          onClick={() => onKeywordClick(row.original)}
-          title="View position history"
-        >
-          {row.original.keyword}
-        </button>
+        {actions ? (
+          <>
+            <PinButton
+              pinned={row.original.pinned}
+              onClick={() =>
+                actions.onSetPinned({
+                  trackingKeywordId: row.original.trackingKeywordId,
+                  pinned: !row.original.pinned,
+                })
+              }
+            />
+            <button
+              type="button"
+              className="text-left font-medium decoration-dotted underline-offset-2 hover:underline"
+              onClick={() => actions.onKeywordClick(row.original)}
+              title="View position history"
+            >
+              {row.original.keyword}
+            </button>
+          </>
+        ) : (
+          <span className="font-medium">{row.original.keyword}</span>
+        )}
         {row.original.matchCase && (
           <Badge
             variant="secondary"
@@ -246,33 +268,24 @@ function makeSerpColumn(
   };
 }
 
+/** Without `actions` the table is read-only: no selection, pins or history. */
 export function useRankTrackingColumns(options: {
   showDesktop: boolean;
   showMobile: boolean;
   domain: string;
-  selectAnchorRef: MutableRefObject<SelectionAnchor | null>;
-  onKeywordClick: (row: RankTrackingRow) => void;
-  onSetPinned: (vars: { trackingKeywordId: string; pinned: boolean }) => void;
+  actions?: RankTrackingActions;
   locationName?: string | null;
 }): ColumnDef<RankTrackingRow>[] {
-  const {
-    showDesktop,
-    showMobile,
-    domain,
-    selectAnchorRef,
-    onKeywordClick,
-    onSetPinned,
-    locationName,
-  } = options;
+  const { showDesktop, showMobile, domain, actions, locationName } = options;
   const locationLabel = locationName
     ? formatLocationLabel(locationName, 2)
     : undefined;
   return useMemo(() => {
-    const cols: ColumnDef<RankTrackingRow>[] = [
-      pinnedColumn,
-      makeSelectionColumn<RankTrackingRow>(selectAnchorRef),
-      makeKeywordColumn(onKeywordClick, onSetPinned),
-    ];
+    const cols: ColumnDef<RankTrackingRow>[] = [pinnedColumn];
+    if (actions) {
+      cols.push(makeSelectionColumn<RankTrackingRow>(actions.selectAnchorRef));
+    }
+    cols.push(makeKeywordColumn(actions));
     if (showDesktop) {
       cols.push(makeDeviceColumn("desktop"));
       cols.push(makeUrlColumn("desktop", domain));
@@ -289,13 +302,5 @@ export function useRankTrackingColumns(options: {
       cols.push(makeSerpColumn("mobile"));
     }
     return cols;
-  }, [
-    showDesktop,
-    showMobile,
-    domain,
-    selectAnchorRef,
-    onKeywordClick,
-    onSetPinned,
-    locationLabel,
-  ]);
+  }, [showDesktop, showMobile, domain, actions, locationLabel]);
 }

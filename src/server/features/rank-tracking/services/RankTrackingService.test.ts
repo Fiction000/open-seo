@@ -20,6 +20,7 @@ vi.mock("cloudflare:workers", () => ({
   env: { RANK_CHECK_WORKFLOW: { create: mocks.startWorkflow } },
 }));
 vi.mock("@/server/lib/runtime-env", () => ({
+  getOptionalEnvValue: () => Promise.resolve(undefined),
   getRequiredEnvValue: () => Promise.resolve("basic-key"),
   isHostedServerAuthMode: mocks.isHosted,
 }));
@@ -217,6 +218,36 @@ describe("RankTrackingService.createConfig", () => {
     expect(error).toMatchObject({ code: "VALIDATION_ERROR" });
     expect(String(error)).toContain("search_serp_locations");
     expect(mocks.createConfig).not.toHaveBeenCalled();
+  });
+});
+
+describe("RankTrackingService.getConfigs", () => {
+  it("lists the project's own site first, however its website was entered", async () => {
+    mocks.getConfigsForProject.mockResolvedValue([
+      { id: "competitor", domain: "rival.com" },
+      { id: "own", domain: "acme.com" },
+    ]);
+
+    const configs = await RankTrackingService.getConfigs(
+      "project_1",
+      "https://www.Acme.com/services",
+    );
+
+    expect(configs.map((config) => config.id)).toEqual(["own", "competitor"]);
+  });
+
+  it("keeps creation order when the project website has no domain in it", async () => {
+    mocks.getConfigsForProject.mockResolvedValue([
+      { id: "first", domain: "rival.com" },
+      { id: "second", domain: "acme.com" },
+    ]);
+
+    const configs = await RankTrackingService.getConfigs(
+      "project_1",
+      "https://",
+    );
+
+    expect(configs.map((config) => config.id)).toEqual(["first", "second"]);
   });
 });
 

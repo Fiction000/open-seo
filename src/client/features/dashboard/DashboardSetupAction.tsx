@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useForm } from "@tanstack/react-form";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ONE_CLICK_INSTALLS } from "@/client/features/ai-mcp/agentInstalls";
 import { getAgentSetupPrompt } from "@/client/features/ai-mcp/agentSetupPrompt";
 import {
   AgentSetupPanel,
@@ -21,12 +22,10 @@ import {
 import { organizationContextQueryOptions } from "@/client/features/team/organizationQueries";
 import { getStandardErrorMessage } from "@/client/lib/error-messages";
 import { captureClientEvent } from "@/client/lib/posthog";
+import { usesBetterAuthClient } from "@/lib/auth-mode";
 import { hasOrgPermission } from "@/lib/org-permissions";
-import { markDashboardStepClicked } from "@/serverFunctions/dashboard";
-import type {
-  DashboardClickStep,
-  DashboardSetupStep,
-} from "@/types/schemas/dashboard";
+import { listMcpConnections } from "@/serverFunctions/mcp-connections";
+import type { DashboardSetupStep } from "@/types/schemas/dashboard";
 import { parseResearchTarget } from "@/shared/researchScope";
 
 const projectPrompt = `Use OpenSEO to set up a separate project for each website below. List my existing projects first and reuse matches so you don’t create duplicates. Set the country and language for each site, and ask me about anything missing.
@@ -49,30 +48,8 @@ export function DashboardSetupAction({
   const navigate = useNavigate();
   const [showModal, setShowModal] = useState(false);
   const org = useQuery(organizationContextQueryOptions());
-  // Click-through steps: record the milestone, then open the page with the
-  // user's input already applied so the research runs on arrival.
-  const clickThrough = useMutation({
-    mutationFn: (input: { step: DashboardClickStep; value: string }) =>
-      markDashboardStepClicked({ data: { projectId, step: input.step } }),
-    onSuccess: async (_, input) => {
-      await queryClient.invalidateQueries({
-        queryKey: ["dashboardActivation", projectId],
-      });
-      onComplete();
-      if (input.step === "competitor")
-        void navigate({
-          to: "/p/$projectId/domain",
-          params: { projectId },
-          search: { domain: input.value },
-        });
-      else
-        void navigate({
-          to: "/p/$projectId/keywords",
-          params: { projectId },
-          search: { q: input.value },
-        });
-    },
-  });
+  // Research steps open the page with the user's input already applied, so
+  // the research runs on arrival and completes the step.
   if (step === "competitor")
     return (
       <StepInputForm
@@ -81,13 +58,14 @@ export function DashboardSetupAction({
         placeholder="competitor.com"
         submitLabel="Explore competitor"
         validate={validateDomain}
-        pending={clickThrough.isPending}
-        onSubmit={(value) =>
-          clickThrough.mutate({
-            step: "competitor",
-            value: parseDomain(value),
-          })
-        }
+        onSubmit={(value) => {
+          onComplete();
+          void navigate({
+            to: "/p/$projectId/domain",
+            params: { projectId },
+            search: { domain: parseDomain(value) },
+          });
+        }}
       />
     );
   if (step === "keywords")
@@ -100,10 +78,14 @@ export function DashboardSetupAction({
         validate={(value) =>
           value.trim() ? undefined : "Enter a keyword to start from"
         }
-        pending={clickThrough.isPending}
-        onSubmit={(value) =>
-          clickThrough.mutate({ step: "keywords", value: value.trim() })
-        }
+        onSubmit={(value) => {
+          onComplete();
+          void navigate({
+            to: "/p/$projectId/keywords",
+            params: { projectId },
+            search: { q: value.trim() },
+          });
+        }}
       />
     );
   if (step === "audit")
@@ -115,7 +97,6 @@ export function DashboardSetupAction({
         defaultValue={domain ? `https://${domain}` : ""}
         submitLabel="Set up audit"
         validate={validateDomain}
-        pending={false}
         onSubmit={(value) => {
           onComplete();
           void navigate({
@@ -146,6 +127,7 @@ export function DashboardSetupAction({
         />
       </div>
     );
+  if (step === "skills") return <DashboardSkillsAction domain={domain} />;
 
   const canManage =
     org.data &&
@@ -229,6 +211,74 @@ export function DashboardSetupAction({
   );
 }
 
+function getSkillsSetupPrompt(domain: string | null) {
+  const site = domain ? ` for ${domain}` : "";
+  return `Check whether I have the OpenSEO skills set up in this agent. If not, walk me through installing them using https://openseo.so/docs/skills/setup. Then recommend the single most useful OpenSEO skill to try first${site} and show me how to run it.`;
+}
+
+function DashboardSkillsAction({ domain }: { domain: string | null }) {
+  const connections = useQuery({
+    queryKey: ["mcpConnections"],
+    queryFn: () => listMcpConnections(),
+    enabled: usesBetterAuthClient(),
+  });
+  const grants = connections.data ?? [];
+  const chats = ONE_CLICK_INSTALLS.filter(({ agent }) =>
+    grants.some((grant) => grant.webChat === agent),
+  );
+  const prompt = getSkillsSetupPrompt(domain);
+
+  return (
+    <div className="max-w-2xl space-y-4">
+      <p className="text-sm leading-relaxed text-muted-foreground">
+        Skills guide your agent through complete SEO workflows and save results
+        as reports.{" "}
+        {chats.length > 0
+          ? "Open a chat to check your skills setup and pick one to try."
+          : "Paste this prompt into your agent to check your skills setup and pick one to try."}
+      </p>
+      <pre className="whitespace-pre-wrap break-words rounded-lg border border-border bg-background/25 p-3.5 font-sans text-sm leading-relaxed text-muted-foreground">
+        {prompt}
+      </pre>
+      <div className="flex flex-wrap items-center gap-2">
+        {chats.map(({ agent, name, newChatUrl, Icon }) => (
+          <Button
+            key={agent}
+            variant={chats.length === 1 ? "default" : "outline"}
+            nativeButton={false}
+            render={
+              <a href={newChatUrl(prompt)} target="_blank" rel="noreferrer" />
+            }
+            onClick={() =>
+              captureClientEvent("dashboard:skills_open_in_agent_click", {
+                agent,
+              })
+            }
+          >
+            <Icon data-icon="inline-start" />
+            Open in {name}
+          </Button>
+        ))}
+        <CopyButton
+          value={prompt}
+          label="Copy prompt"
+          successMessage="Prompt copied"
+          variant={chats.length === 0 ? "default" : "outline"}
+          size="default"
+          onCopy={() => captureClientEvent("dashboard:skills_prompt_copy")}
+        />
+        <Link
+          to="/ai"
+          search={{ tab: "skills" }}
+          className="ml-1 text-sm text-muted-foreground hover:text-foreground"
+        >
+          Browse skills
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 function validateDomain(value: string) {
   const parsed = parseResearchTarget(value);
   return parsed.ok ? undefined : parsed.message;
@@ -246,7 +296,6 @@ function StepInputForm({
   defaultValue = "",
   submitLabel,
   validate,
-  pending,
   onSubmit,
 }: {
   description: string;
@@ -255,7 +304,6 @@ function StepInputForm({
   defaultValue?: string;
   submitLabel: string;
   validate: (value: string) => string | undefined;
-  pending: boolean;
   onSubmit: (value: string) => void;
 }) {
   const form = useForm({
@@ -308,7 +356,7 @@ function StepInputForm({
       </form.Field>
       <form.Subscribe selector={(state) => state.canSubmit}>
         {(canSubmit) => (
-          <Button type="submit" size="lg" disabled={!canSubmit || pending}>
+          <Button type="submit" size="lg" disabled={!canSubmit}>
             {submitLabel}
           </Button>
         )}

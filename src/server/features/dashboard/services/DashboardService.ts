@@ -6,6 +6,7 @@ import { AuditRepository } from "@/server/features/audit/repositories/AuditRepos
 import { getIssueTypePageCountsForAudit } from "@/server/features/audit/repositories/auditSummaryQueries";
 import { Ga4ConnectionRepository } from "@/server/features/ga4/repositories/Ga4ConnectionRepository";
 import { GscConnectionRepository } from "@/server/features/gsc/repositories/GscConnectionRepository";
+import { ReportRepository } from "@/server/features/reports/repositories/ReportRepository";
 
 export type DashboardActivation = {
   domain: string | null;
@@ -18,11 +19,14 @@ export type DashboardActivation = {
   mcp: {
     authorizedAt: string | null;
     firstToolCallAt: string | null;
-    cardDismissedAt: string | null;
+    // The agent cards above the checklist, separate from the agent step.
+    cardDismissed: boolean;
   };
-  competitorClickedAt: string | null;
-  keywordsClickedAt: string | null;
+  // Workspace-wide: research, audits, and skill reports on any project count.
+  competitorResearchedAt: string | null;
+  keywordsResearchedAt: string | null;
   hasAudit: boolean;
+  hasSkillReport: boolean;
   hasMultipleProjects: boolean;
   hasTeammate: boolean;
   dismissedSteps: string[];
@@ -62,8 +66,10 @@ async function getActivation(input: {
     projectActivation,
     projectCount,
     hasTeammate,
-    dismissed,
-    latestAudit,
+    dismissals,
+    research,
+    hasAudit,
+    hasSkillReport,
   ] = await Promise.all([
     Ga4ConnectionRepository.getByProjectId(input.projectId),
     GscConnectionRepository.getByProjectId(input.projectId),
@@ -71,15 +77,17 @@ async function getActivation(input: {
     ActivationRepository.getProjectActivation(input.projectId),
     ProjectRepository.countProjects(input.organizationId),
     ActivationRepository.hasTeammate(input.organizationId),
-    ActivationRepository.getDismissedSteps(input.userId, input.projectId),
-    AuditRepository.getLatestAuditForProject(input.projectId),
+    ActivationRepository.getDismissals(input),
+    ActivationRepository.getWorkspaceResearch(input.organizationId),
+    AuditRepository.hasAuditInOrganization(input.organizationId),
+    ReportRepository.hasSkillReportInOrganization(input.organizationId),
   ]);
 
   return {
     domain: input.domain,
     hasMultipleProjects: projectCount > 1,
     hasTeammate,
-    dismissedSteps: dismissed.map((row) => row.step),
+    dismissedSteps: dismissals.skippedSteps,
     ga4: {
       connected: ga4 !== null,
       propertyDisplayName: ga4?.propertyDisplayName ?? null,
@@ -89,11 +97,12 @@ async function getActivation(input: {
     mcp: {
       authorizedAt: orgActivation?.firstMcpAuthorizedAt ?? null,
       firstToolCallAt: orgActivation?.firstMcpToolCallAt ?? null,
-      cardDismissedAt: projectActivation?.mcpCardDismissedAt ?? null,
+      cardDismissed: dismissals.agentCardDismissed,
     },
-    competitorClickedAt: projectActivation?.competitorStepClickedAt ?? null,
-    keywordsClickedAt: projectActivation?.keywordStepClickedAt ?? null,
-    hasAudit: latestAudit != null,
+    competitorResearchedAt: research.competitorResearchedAt,
+    keywordsResearchedAt: research.keywordResearchedAt,
+    hasAudit,
+    hasSkillReport,
   };
 }
 

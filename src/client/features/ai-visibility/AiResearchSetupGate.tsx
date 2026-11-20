@@ -18,6 +18,7 @@ import { saveProjectWebsiteSetup } from "@/serverFunctions/projectWebsite";
 import { PROSE_MAX_CHARS } from "@/types/schemas/projectContext";
 import type { SaveProjectWebsiteSetup } from "@/types/schemas/projectWebsite";
 import { SkeletonPageContent } from "@/client/components/SkeletonPresets";
+import { OpenRouterKeyGate } from "./OpenRouterKeyGate";
 import {
   AiQueryError,
   aiResearchKeywordsQueryOptions,
@@ -162,95 +163,101 @@ export function AiResearchSetupGate({
     return children;
   if (setup.data.review)
     return (
-      <div className="grid min-h-[calc(100dvh-8rem)] place-items-center">
-        <WebsiteSetupReview
-          projectId={projectId}
-          research={setup.data.review}
-          saving={save.isPending}
-          error={save.isError}
-          onSave={(accepted) => save.mutate(accepted)}
-        />
-      </div>
+      <OpenRouterKeyGate projectId={projectId}>
+        <div className="grid min-h-[calc(100dvh-8rem)] place-items-center">
+          <WebsiteSetupReview
+            projectId={projectId}
+            research={setup.data.review}
+            saving={save.isPending}
+            error={save.isError}
+            onSave={(accepted) => save.mutate(accepted)}
+          />
+        </div>
+      </OpenRouterKeyGate>
     );
   if (status === "running" || start.isPending || finishing)
     return (
-      <div className="grid min-h-[calc(100dvh-8rem)] place-items-center">
-        <WebsiteResearchProgress
-          missingOverview={setup.data.missingOverview}
-          missingCompetitors={setup.data.missingCompetitors}
-          note="You can leave this page; setup keeps running."
-        />
-      </div>
+      <OpenRouterKeyGate projectId={projectId}>
+        <div className="grid min-h-[calc(100dvh-8rem)] place-items-center">
+          <WebsiteResearchProgress
+            missingOverview={setup.data.missingOverview}
+            missingCompetitors={setup.data.missingCompetitors}
+            note="You can leave this page; setup keeps running."
+          />
+        </div>
+      </OpenRouterKeyGate>
     );
   const failed = status === "failed" || start.isError;
   const unreadable =
     !start.isError && setup.data.failure === "website_unreadable";
   return (
-    <div className="grid min-h-[calc(100dvh-8rem)] place-items-center">
-      <Card className="w-full max-w-2xl py-6 md:py-8">
-        <CardContent className="space-y-6 px-6 md:px-8">
-          <div>
-            <div className="mb-4 flex size-10 items-center justify-center rounded-lg border border-border bg-muted">
-              <Sparkles className="size-5" />
+    <OpenRouterKeyGate projectId={projectId}>
+      <div className="grid min-h-[calc(100dvh-8rem)] place-items-center">
+        <Card className="w-full max-w-2xl py-6 md:py-8">
+          <CardContent className="space-y-6 px-6 md:px-8">
+            <div>
+              <div className="mb-4 flex size-10 items-center justify-center rounded-lg border border-border bg-muted">
+                <Sparkles className="size-5" />
+              </div>
+              <h1 className="text-2xl font-semibold tracking-tight">
+                Set up AI visibility
+              </h1>
+              <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+                We’ll research your brand and find the most relevant topics to
+                monitor.
+              </p>
             </div>
-            <h1 className="text-2xl font-semibold tracking-tight">
-              Set up AI visibility
-            </h1>
-            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-              We’ll research your brand and find the most relevant topics to
-              monitor.
-            </p>
-          </div>
-          {getErrorCode(start.error) === "INSUFFICIENT_CREDITS" ? (
-            <InsufficientCreditsError title="We couldn’t set up AI visibility" />
-          ) : (
-            failed && (
-              <Alert variant="destructive">
-                <AlertDescription>
-                  {unreadable
-                    ? "We couldn’t read this website. Its bot protection may be blocking us. Describe your business below and try again, or check the URL in project settings."
-                    : "We couldn’t finish setting up AI visibility. Try again."}
-                </AlertDescription>
-              </Alert>
-            )
-          )}
-          {unreadable && (
-            <Field>
-              <FieldLabel htmlFor="business-overview">
-                What you sell, who buys it, and where
-              </FieldLabel>
-              <Textarea
-                id="business-overview"
-                value={overview}
-                onChange={(event) => setOverview(event.target.value)}
-                maxLength={PROSE_MAX_CHARS}
-                rows={4}
-              />
-              {saveOverview.isError && (
-                <p className="text-sm text-destructive">
-                  We couldn’t save your description. Try again.
-                </p>
-              )}
-            </Field>
-          )}
-          <div className="space-y-3">
-            <Button
-              size="lg"
-              className="w-full"
-              pending={saveOverview.isPending}
-              onClick={() =>
-                overview.trim() ? saveOverview.mutate() : start.mutate()
-              }
-            >
-              {failed ? "Try again" : "Start research"}
-            </Button>
-            <p className="text-xs leading-relaxed text-muted-foreground">
-              Research and a first run of your prompts use a small amount of
-              usage credits.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+            {getErrorCode(start.error) === "INSUFFICIENT_CREDITS" ? (
+              <InsufficientCreditsError title="We couldn’t set up AI visibility" />
+            ) : (
+              failed && (
+                <Alert variant="destructive">
+                  <AlertDescription>
+                    {unreadable
+                      ? "We couldn’t read this website. Its bot protection may be blocking us. Describe your business below and try again, or check the URL in project settings."
+                      : "We couldn’t finish setting up AI visibility. Try again."}
+                  </AlertDescription>
+                </Alert>
+              )
+            )}
+            {unreadable && (
+              <Field>
+                <FieldLabel htmlFor="business-overview">
+                  What you sell, who buys it, and where
+                </FieldLabel>
+                <Textarea
+                  id="business-overview"
+                  value={overview}
+                  onChange={(event) => setOverview(event.target.value)}
+                  maxLength={PROSE_MAX_CHARS}
+                  rows={4}
+                />
+                {saveOverview.isError && (
+                  <p className="text-sm text-destructive">
+                    We couldn’t save your description. Try again.
+                  </p>
+                )}
+              </Field>
+            )}
+            <div className="space-y-3">
+              <Button
+                size="lg"
+                className="w-full"
+                pending={saveOverview.isPending}
+                onClick={() =>
+                  overview.trim() ? saveOverview.mutate() : start.mutate()
+                }
+              >
+                {failed ? "Try again" : "Start research"}
+              </Button>
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                Research and a first run of your prompts use a small amount of
+                usage credits.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </OpenRouterKeyGate>
   );
 }

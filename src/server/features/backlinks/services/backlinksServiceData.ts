@@ -1,3 +1,4 @@
+import { getDomain } from "tldts";
 import { z } from "zod";
 import type { BillingCustomerContext } from "@/server/billing/subscription";
 import type { CreditFeature } from "@/shared/billing-credit-features";
@@ -129,11 +130,26 @@ export async function profileBacklinksOverview(
     // so trends are unavailable for a page and subdomain-inclusive otherwise.
     normalizedTarget.scope === "exact_url"
       ? Promise.resolve([])
-      : dataforseo.backlinks.history({
-          target: normalizedTarget.apiTarget,
-          ...dateRange,
-          creditFeature,
-        }),
+      : dataforseo.backlinks
+          .history({
+            target: normalizedTarget.apiTarget,
+            ...dateRange,
+            creditFeature,
+          })
+          .catch((error: unknown) => {
+            // History fails for some subdomains (health.oregonstate.edu) whose
+            // summary loads fine; show the summary without trends.
+            if (
+              getDomain(normalizedTarget.apiTarget) ===
+              normalizedTarget.apiTarget
+            )
+              throw error;
+            console.warn(
+              `[backlinks] history unavailable for ${normalizedTarget.apiTarget}:`,
+              error,
+            );
+            return [];
+          }),
   ]);
 
   const overview = buildOverviewResult({
@@ -356,12 +372,28 @@ function buildOverviewResult(args: {
         args.summary.lost_reffering_domains ??
         null,
     },
-    trends: historyRows.map((item) => ({
-      date: item.date,
-      backlinks: item.backlinks,
-      referringDomains: item.referringDomains,
-      rank: item.rank,
-    })),
+    trends: [
+      ...historyRows.map((item) => ({
+        date: item.date,
+        backlinks: item.backlinks,
+        referringDomains: item.referringDomains,
+        rank: item.rank,
+      })),
+      // History has one snapshot per finished month, so the chart would stop
+      // at last month's end. The summary is current; plot it as today's point.
+      // History is always subdomain-inclusive, so a summary that excludes
+      // subdomains would not line up with it.
+      ...(historyRows.length > 0 && args.normalizedTarget.includeSubdomains
+        ? [
+            {
+              date: args.now.toISOString().slice(0, 10),
+              backlinks: args.summary.backlinks ?? null,
+              referringDomains: args.summary.referring_domains ?? null,
+              rank: args.summary.rank ?? null,
+            },
+          ]
+        : []),
+    ],
     newLostTrends: historyRows.map((item) => ({
       date: item.date,
       newBacklinks: item.newBacklinks,

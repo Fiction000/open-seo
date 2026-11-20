@@ -4,6 +4,7 @@ import {
   FolderPlus,
   Globe,
   Lightbulb,
+  Sparkles,
   Users,
 } from "lucide-react";
 import type { DashboardActivation } from "@/server/features/dashboard/services/DashboardService";
@@ -14,36 +15,49 @@ export const setupSteps: {
   label: string;
   detail: string;
   icon: typeof Globe;
+  skipLabel: string;
 }[] = [
   {
     id: "competitor",
     label: "Explore a competitor",
     detail: "Find topics and links worth learning from.",
     icon: Globe,
+    skipLabel: "Skip for now",
   },
   {
     id: "keywords",
     label: "Get keyword ideas",
     detail: "Start from one keyword and see what people search for.",
     icon: Lightbulb,
+    skipLabel: "Skip for now",
   },
   {
     id: "audit",
     label: "Audit your site",
     detail: "Crawl for broken links, missing tags, and indexability problems.",
     icon: ClipboardCheck,
+    skipLabel: "Skip for now",
   },
   {
     id: "mcp",
     label: "Connect your AI agent",
     detail: "Use OpenSEO inside Claude or your favorite agent.",
     icon: Bot,
+    skipLabel: "Skip for now",
+  },
+  {
+    id: "skills",
+    label: "Try OpenSEO skills",
+    detail: "Give your agent repeatable SEO workflows.",
+    icon: Sparkles,
+    skipLabel: "Dismiss",
   },
   {
     id: "team",
     label: "Invite a teammate",
     detail: "Share the work, or keep things solo for now.",
     icon: Users,
+    skipLabel: "Skip",
   },
   {
     id: "project",
@@ -51,29 +65,49 @@ export const setupSteps: {
     detail:
       "Create another project, or let your AI agent set up a list of sites.",
     icon: FolderPlus,
+    skipLabel: "I only need one project",
   },
 ];
+
+export function isAgentConnected(activation: DashboardActivation) {
+  return (
+    activation.mcp.authorizedAt !== null ||
+    activation.mcp.firstToolCallAt !== null
+  );
+}
+
+export function getVisibleSteps(
+  activation: DashboardActivation,
+  includeTeam: boolean,
+) {
+  return setupSteps.filter((step) => {
+    if (step.id === "team") return includeTeam;
+    if (step.id === "skills") return isAgentConnected(activation);
+    return true;
+  });
+}
 
 export function getStepStatus(
   activation: DashboardActivation,
   step: DashboardSetupStep,
 ): "done" | "skipped" | "todo" {
   const completed: Record<DashboardSetupStep, boolean> = {
-    competitor: activation.competitorClickedAt !== null,
-    keywords: activation.keywordsClickedAt !== null,
+    competitor: activation.competitorResearchedAt !== null,
+    keywords: activation.keywordsResearchedAt !== null,
     audit: activation.hasAudit,
-    mcp:
-      activation.mcp.authorizedAt !== null ||
-      activation.mcp.firstToolCallAt !== null,
+    mcp: isAgentConnected(activation),
+    skills: activation.hasSkillReport,
     team: activation.hasTeammate,
     project: activation.hasMultipleProjects,
   };
   if (completed[step]) return "done";
-  // Preserve previous MCP dismissals without treating them as authorization.
-  if (
-    activation.dismissedSteps.includes(step) ||
-    (step === "mcp" && activation.mcp.cardDismissedAt !== null)
-  )
-    return "skipped";
-  return "todo";
+  if (!activation.dismissedSteps.includes(step)) return "todo";
+  return completeWhenSkipped.has(step) ? "done" : "skipped";
 }
+
+// Skipping these marks them complete, so they never wait in "saved for later".
+const completeWhenSkipped = new Set<DashboardSetupStep>([
+  "skills",
+  "team",
+  "project",
+]);

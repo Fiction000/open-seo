@@ -45,14 +45,36 @@ OpenSEO exposes an MCP server so AI agents like Claude Code, OpenClaw, and Herme
 
 ## Self-Hosting
 
-OpenSEO supports two self-hosting paths:
+### Recommended: EveryApp
 
-- **Simple: Docker (Best for testing it out)** - For personal use on your own machine. See [`docs/SELF_HOSTING_DOCKER.md`](./docs/SELF_HOSTING_DOCKER.md).
-  - Unless you already are self-hosting other apps and are confident doing so, we recommend self-hosting with Cloudflare as opposed to Railway, Coolify or Dokploy.
-  - We plan to make it simpler to host on those platforms in the next few months.
-- **Recommended: Cloudflare** - For internet-facing self-hosting across multiple devices or with your team (works on the free plan). See [`docs/SELF_HOSTING_CLOUDFLARE.md`](./docs/SELF_HOSTING_CLOUDFLARE.md).
+EveryApp simplifies self hosting open source apps + personal software. It runs entirely in your Cloudflare account on their $5/month plan.
 
-Either way, you need a DataForSEO API key to get SEO data. See [`docs/DATAFORSEO_API_KEY.md`](./docs/DATAFORSEO_API_KEY.md).
+It's also the company behind OpenSEO. OpenSEO actually started out because I was trying to do SEO for EveryApp. But, then people loved it so much that we paused EveryApp for a while. We've since relaunched it and think it's the best way to self host OpenSEO.
+
+https://everyapp.com/docs/apps/openseo
+
+```bash
+npm install -g everyapp
+everyapp setup --domain apps.yourcompany.com
+everyapp install https://github.com/every-app/open-seo
+```
+
+### DataForSEO API Key
+
+You need a DataForSEO API key to get SEO data, or a [treg](https://treg.to) account which also gives access to DataForSEO. See [`docs/DATAFORSEO_API_KEY.md`](./docs/DATAFORSEO_API_KEY.md).
+
+### Other options
+
+OpenSEO also supports two standalone self-hosting paths. Both use email and password accounts: the first visitor creates the admin account, teammates join from invitation links, and MCP clients (Claude, ChatGPT, Codex, Cursor) sign in with the same accounts.
+
+- **Docker** - On your own server or computer, with a prebuilt image that is ready in seconds. Works with Compose-based platforms such as Coolify, Portainer and Dokploy. See [`docs/SELF_HOSTING_DOCKER.md`](./docs/SELF_HOSTING_DOCKER.md).
+  - Running the older single-container image? It keeps getting updates; [move to the new setup](./docs/SELF_HOSTING_DOCKER.md#move-from-the-old-docker-image) when you are ready, data included.
+- **Cloudflare** - Self host on Cloudflare, but not with EveryApp. See [`docs/SELF_HOSTING_CLOUDFLARE.md`](./docs/SELF_HOSTING_CLOUDFLARE.md).
+
+For security-conscious setups, two advanced options replace the accounts with your own network controls:
+
+- **Cloudflare Access** in front of the Cloudflare deploy, so Cloudflare checks every request before it reaches OpenSEO. See [`docs/SELF_HOSTING_CLOUDFLARE.md`](./docs/SELF_HOSTING_CLOUDFLARE.md).
+- **No sign-in on Docker**, behind Tailscale, a private network or your own authenticating proxy. See [Without sign-in](./docs/SELF_HOSTING_DOCKER.md#without-sign-in-advanced).
 
 ## Costs
 
@@ -70,7 +92,7 @@ See [`docs/LOCAL_DEVELOPMENT.md`](./docs/LOCAL_DEVELOPMENT.md).
 
 Creating clear issues is the best way to contribute.
 
-Read more here: [`docs/CONTRIBUTING.md`](./docs/CONTRIBUTING.md)
+Read more here: [`.github/CONTRIBUTING.md`](./.github/CONTRIBUTING.md)
 
 We have this skill: `/simple-issue-description` which helps.
 

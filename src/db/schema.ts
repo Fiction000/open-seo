@@ -12,6 +12,9 @@ import * as sqliteGsc from "./gsc.schema";
 import * as sqliteTelemetry from "./telemetry.schema";
 import * as sqliteAiVisibility from "./ai-visibility.schema";
 import * as sqliteLocalSeo from "./local-seo.schema";
+import * as sqliteStripeProjects from "./stripe-projects.schema";
+import * as sqliteEmbeds from "./embeds.schema";
+import * as sqliteEveryAppTransfer from "./every-app-transfer.schema";
 import * as pgApp from "./pg/app.schema";
 import * as pgProjectContext from "./pg/project-context.schema";
 import * as pgReports from "./pg/reports.schema";
@@ -25,6 +28,9 @@ import * as pgGsc from "./pg/gsc.schema";
 import * as pgTelemetry from "./pg/telemetry.schema";
 import * as pgAiVisibility from "./pg/ai-visibility.schema";
 import * as pgLocalSeo from "./pg/local-seo.schema";
+import * as pgStripeProjects from "./pg/stripe-projects.schema";
+import * as pgEmbeds from "./pg/embeds.schema";
+import * as pgEveryAppTransfer from "./pg/every-app-transfer.schema";
 
 // Canonical schema barrel. Repositories import their tables from here and the
 // provider-aware `db` from "@/db", so each repository is written ONCE for both
@@ -48,7 +54,10 @@ type AppSchema = typeof sqliteApp &
   typeof sqliteGsc &
   typeof sqliteTelemetry &
   typeof sqliteAiVisibility &
-  typeof sqliteLocalSeo;
+  typeof sqliteLocalSeo &
+  typeof sqliteStripeProjects &
+  typeof sqliteEmbeds &
+  typeof sqliteEveryAppTransfer;
 
 const runtimeSchema =
   getDatabaseProvider() === "postgres"
@@ -66,6 +75,9 @@ const runtimeSchema =
         ...pgTelemetry,
         ...pgAiVisibility,
         ...pgLocalSeo,
+        ...pgStripeProjects,
+        ...pgEmbeds,
+        ...pgEveryAppTransfer,
       }
     : {
         ...sqliteApp,
@@ -81,6 +93,9 @@ const runtimeSchema =
         ...sqliteTelemetry,
         ...sqliteAiVisibility,
         ...sqliteLocalSeo,
+        ...sqliteStripeProjects,
+        ...sqliteEmbeds,
+        ...sqliteEveryAppTransfer,
       };
 
 // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- guarded by schema-parity.test.ts
@@ -89,6 +104,8 @@ const schema = runtimeSchema as unknown as AppSchema;
 export const {
   userOnboardingAnswers,
   userSignupCampaigns,
+  accountDeletionRequests,
+  guestAccounts,
   projects,
   savedKeywords,
   savedKeywordTags,
@@ -140,4 +157,9 @@ export const {
   localRankPoints,
   localRankBusinesses,
   localRankResults,
+  stripeProjectsGrants,
+  stripeProjectsResources,
+  projectEmbeds,
+  everyAppTransfers,
+  everyAppTransferUsers,
 } = schema;

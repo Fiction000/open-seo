@@ -7,7 +7,7 @@ import {
   originValidationResponse,
   WebStandardStreamableHTTPServerTransport,
 } from "@modelcontextprotocol/server";
-import { getHostedBaseUrl } from "@/lib/auth";
+import { getAuth, getHostedBaseUrl } from "@/lib/auth";
 import { MCP_SCOPE } from "@/lib/oauth-resource";
 import { resolveCloudflareAccessContext } from "@/middleware/ensure-user/cloudflareAccess";
 import { resolveLocalNoAuthContext } from "@/middleware/ensure-user/delegated";
@@ -27,7 +27,7 @@ import { getPublicOrigin } from "@/server/mcp/public-origin";
 import { createOpenSeoMcpServer } from "@/server/mcp/server";
 import { supportsMcpApps } from "@/server/mcp/ui-capabilities";
 import { AuthRepository } from "@/server/auth/repositories/AuthRepository";
-import { resolveExistingActiveHostedOrganization } from "@/server/auth/default-hosted-organization";
+import { resolveActiveHostedOrganization } from "@/server/auth/default-hosted-organization";
 import {
   PERSONAL_MCP_PATH,
   personalMcpHttpError,
@@ -189,7 +189,9 @@ async function resolveRequestOrganization(
 ) {
   const membership = await AuthRepository.getMembership(userId, organizationId);
   if (membership) return { organizationId, role: membership.role };
-  return resolveExistingActiveHostedOrganization(userId);
+  return resolveActiveHostedOrganization(userId, (body) =>
+    getAuth().api.createOrganization({ body }),
+  );
 }
 
 async function handleAuthenticatedOpenSeoMcpRequestImpl(

@@ -26,19 +26,27 @@ async function requireProjectAccess(
   // returned auth is rebound to the project's org + the member's role there,
   // so billing and every downstream org read follow the project.
   if (auth.orgScope === "user") {
-    const resolved = await ProjectService.getProjectWithOrganization(projectId);
-    const membership = resolved
-      ? await AuthRepository.getMembership(auth.userId, resolved.organizationId)
+    const organizationId =
+      await ProjectService.getProjectOrganizationId(projectId);
+    const membership = organizationId
+      ? await AuthRepository.getMembership(auth.userId, organizationId)
       : null;
+    const project =
+      organizationId && membership
+        ? await ProjectService.getProjectForOrganization(
+            organizationId,
+            projectId,
+          )
+        : null;
     // One FORBIDDEN for both unknown project and non-membership, so probing
     // with foreign project ids can't distinguish "exists" from "no access".
-    if (!resolved || !membership) {
+    if (!organizationId || !project || !membership) {
       throw new AppError("FORBIDDEN");
     }
 
     const projectAuth = {
       ...auth,
-      organizationId: resolved.organizationId,
+      organizationId,
       role: membership.role,
     };
     // instrumentMcpToolHandler wraps outside this gate and reads
@@ -49,7 +57,7 @@ async function requireProjectAccess(
       auth: projectAuth,
       baseUrl,
       billing: buildBillingCustomer(projectAuth, projectId),
-      project: resolved.project,
+      project,
     };
   }
 

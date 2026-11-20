@@ -13,6 +13,7 @@ import { Route as AppRouteRouteImport } from './routes/_app/route'
 import { Route as AuthRouteImport } from './routes/_auth'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AuthErrorRouteImport } from './routes/auth-error'
+import { Route as ConnectRouteImport } from './routes/connect'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as VerifyEmailRouteImport } from './routes/verify-email'
@@ -28,11 +29,13 @@ import { Route as AuthSignInRouteImport } from './routes/_auth.sign-in'
 import { Route as AuthSignUpRouteImport } from './routes/_auth.sign-up'
 import { Route as AuthenticatedOauthConsentRouteImport } from './routes/_authenticated.oauth-consent'
 import { Route as AuthenticatedSubscribeRouteImport } from './routes/_authenticated.subscribe'
-import { Route as AuthenticatedYcRouteImport } from './routes/_authenticated.yc'
 import { Route as AcceptInvitationIdRouteImport } from './routes/accept-invitation.$id'
+import { Route as ApiCspReportRouteImport } from './routes/api/csp-report'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as ApiPrivacyRegionRouteImport } from './routes/api/privacy-region'
+import { Route as ApiSignUpStatusRouteImport } from './routes/api/sign-up-status'
 import { Route as RReportIdRouteImport } from './routes/r/$reportId'
+import { Route as StripeProjectsLoginRouteImport } from './routes/stripe-projects.login'
 import { Route as AppBillingFixPaymentRouteImport } from './routes/_app/billing_.fix-payment'
 import { Route as AppHelpDataforseoApiKeyRouteImport } from './routes/_app/help/dataforseo-api-key'
 import { Route as AppHelpOpenrouterApiKeyRouteImport } from './routes/_app/help/openrouter-api-key'
@@ -42,6 +45,9 @@ import { Route as AppSettingsOrganizationRouteImport } from './routes/_app/setti
 import { Route as AuthenticatedOnboardingIndexRouteImport } from './routes/_authenticated.onboarding.index'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiAutumnSplatRouteImport } from './routes/api/autumn/$'
+import { Route as ETokenIndexRouteImport } from './routes/e/$token/index'
+import { Route as ETokenWidgetRouteImport } from './routes/e/$token/$widget'
+import { Route as ETokenDataRouteImport } from './routes/e/$token/data'
 import { Route as ReportMapGrantCopyrightRouteImport } from './routes/report-map/$grant/copyright'
 import { Route as STokenIndexRouteImport } from './routes/s/$token/index'
 import { Route as STokenOgDotpngRouteImport } from './routes/s/$token/og[.]png'
@@ -95,6 +101,11 @@ const AuthenticatedRoute = AuthenticatedRouteImport.update({
 const AuthErrorRoute = AuthErrorRouteImport.update({
   id: '/auth-error',
   path: '/auth-error',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ConnectRoute = ConnectRouteImport.update({
+  id: '/connect',
+  path: '/connect',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
@@ -175,14 +186,14 @@ const AuthenticatedSubscribeRoute = AuthenticatedSubscribeRouteImport.update({
   path: '/subscribe',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedYcRoute = AuthenticatedYcRouteImport.update({
-  id: '/yc',
-  path: '/yc',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
 const AcceptInvitationIdRoute = AcceptInvitationIdRouteImport.update({
   id: '/accept-invitation/$id',
   path: '/accept-invitation/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCspReportRoute = ApiCspReportRouteImport.update({
+  id: '/api/csp-report',
+  path: '/api/csp-report',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiHealthRoute = ApiHealthRouteImport.update({
@@ -195,9 +206,19 @@ const ApiPrivacyRegionRoute = ApiPrivacyRegionRouteImport.update({
   path: '/api/privacy-region',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiSignUpStatusRoute = ApiSignUpStatusRouteImport.update({
+  id: '/api/sign-up-status',
+  path: '/api/sign-up-status',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RReportIdRoute = RReportIdRouteImport.update({
   id: '/r/$reportId',
   path: '/r/$reportId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StripeProjectsLoginRoute = StripeProjectsLoginRouteImport.update({
+  id: '/stripe-projects/login',
+  path: '/stripe-projects/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppBillingFixPaymentRoute = AppBillingFixPaymentRouteImport.update({
@@ -244,6 +265,21 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
 const ApiAutumnSplatRoute = ApiAutumnSplatRouteImport.update({
   id: '/api/autumn/$',
   path: '/api/autumn/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ETokenIndexRoute = ETokenIndexRouteImport.update({
+  id: '/e/$token/',
+  path: '/e/$token/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ETokenWidgetRoute = ETokenWidgetRouteImport.update({
+  id: '/e/$token/$widget',
+  path: '/e/$token/$widget',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ETokenDataRoute = ETokenDataRouteImport.update({
+  id: '/e/$token/data',
+  path: '/e/$token/data',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReportMapGrantCopyrightRoute = ReportMapGrantCopyrightRouteImport.update({
@@ -455,6 +491,7 @@ const ApiLocalSeoMapsProjectIdZXYRoute =
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/auth-error': typeof AuthErrorRoute
+  '/connect': typeof ConnectRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/reset-password': typeof ResetPasswordRoute
   '/verify-email': typeof VerifyEmailRoute
@@ -469,11 +506,13 @@ export interface FileRoutesByFullPath {
   '/sign-up': typeof AuthSignUpRoute
   '/oauth-consent': typeof AuthenticatedOauthConsentRoute
   '/subscribe': typeof AuthenticatedSubscribeRoute
-  '/yc': typeof AuthenticatedYcRoute
   '/accept-invitation/$id': typeof AcceptInvitationIdRoute
+  '/api/csp-report': typeof ApiCspReportRoute
   '/api/health': typeof ApiHealthRoute
   '/api/privacy-region': typeof ApiPrivacyRegionRoute
+  '/api/sign-up-status': typeof ApiSignUpStatusRoute
   '/r/$reportId': typeof RReportIdRoute
+  '/stripe-projects/login': typeof StripeProjectsLoginRoute
   '/p/$projectId': typeof AppPProjectIdRouteRouteWithChildren
   '/billing/fix-payment': typeof AppBillingFixPaymentRoute
   '/help/dataforseo-api-key': typeof AppHelpDataforseoApiKeyRoute
@@ -481,11 +520,14 @@ export interface FileRoutesByFullPath {
   '/settings/organization': typeof AppSettingsOrganizationRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/autumn/$': typeof ApiAutumnSplatRoute
+  '/e/$token/$widget': typeof ETokenWidgetRoute
+  '/e/$token/data': typeof ETokenDataRoute
   '/report-map/$grant/copyright': typeof ReportMapGrantCopyrightRoute
   '/s/$token/og.png': typeof STokenOgDotpngRoute
   '/s/$token/raw': typeof STokenRawRoute
   '/settings/': typeof AppSettingsIndexRoute
   '/onboarding/': typeof AuthenticatedOnboardingIndexRoute
+  '/e/$token/': typeof ETokenIndexRoute
   '/s/$token/': typeof STokenIndexRoute
   '/p/$projectId/ai-visibility': typeof AppPProjectIdAiVisibilityRouteWithChildren
   '/p/$projectId/backlinks': typeof AppPProjectIdBacklinksRoute
@@ -524,6 +566,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof AppIndexRoute
   '/auth-error': typeof AuthErrorRoute
+  '/connect': typeof ConnectRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/reset-password': typeof ResetPasswordRoute
   '/verify-email': typeof VerifyEmailRoute
@@ -537,22 +580,27 @@ export interface FileRoutesByTo {
   '/sign-up': typeof AuthSignUpRoute
   '/oauth-consent': typeof AuthenticatedOauthConsentRoute
   '/subscribe': typeof AuthenticatedSubscribeRoute
-  '/yc': typeof AuthenticatedYcRoute
   '/accept-invitation/$id': typeof AcceptInvitationIdRoute
+  '/api/csp-report': typeof ApiCspReportRoute
   '/api/health': typeof ApiHealthRoute
   '/api/privacy-region': typeof ApiPrivacyRegionRoute
+  '/api/sign-up-status': typeof ApiSignUpStatusRoute
   '/r/$reportId': typeof RReportIdRoute
+  '/stripe-projects/login': typeof StripeProjectsLoginRoute
   '/billing/fix-payment': typeof AppBillingFixPaymentRoute
   '/help/dataforseo-api-key': typeof AppHelpDataforseoApiKeyRoute
   '/help/openrouter-api-key': typeof AppHelpOpenrouterApiKeyRoute
   '/settings/organization': typeof AppSettingsOrganizationRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/autumn/$': typeof ApiAutumnSplatRoute
+  '/e/$token/$widget': typeof ETokenWidgetRoute
+  '/e/$token/data': typeof ETokenDataRoute
   '/report-map/$grant/copyright': typeof ReportMapGrantCopyrightRoute
   '/s/$token/og.png': typeof STokenOgDotpngRoute
   '/s/$token/raw': typeof STokenRawRoute
   '/settings': typeof AppSettingsIndexRoute
   '/onboarding': typeof AuthenticatedOnboardingIndexRoute
+  '/e/$token': typeof ETokenIndexRoute
   '/s/$token': typeof STokenIndexRoute
   '/p/$projectId/backlinks': typeof AppPProjectIdBacklinksRoute
   '/p/$projectId/brand-lookup': typeof AppPProjectIdBrandLookupRoute
@@ -590,6 +638,7 @@ export interface FileRoutesById {
   '/_auth': typeof AuthRouteWithChildren
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/auth-error': typeof AuthErrorRoute
+  '/connect': typeof ConnectRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/reset-password': typeof ResetPasswordRoute
   '/verify-email': typeof VerifyEmailRoute
@@ -604,11 +653,13 @@ export interface FileRoutesById {
   '/_auth/sign-up': typeof AuthSignUpRoute
   '/_authenticated/oauth-consent': typeof AuthenticatedOauthConsentRoute
   '/_authenticated/subscribe': typeof AuthenticatedSubscribeRoute
-  '/_authenticated/yc': typeof AuthenticatedYcRoute
   '/accept-invitation/$id': typeof AcceptInvitationIdRoute
+  '/api/csp-report': typeof ApiCspReportRoute
   '/api/health': typeof ApiHealthRoute
   '/api/privacy-region': typeof ApiPrivacyRegionRoute
+  '/api/sign-up-status': typeof ApiSignUpStatusRoute
   '/r/$reportId': typeof RReportIdRoute
+  '/stripe-projects/login': typeof StripeProjectsLoginRoute
   '/_app/': typeof AppIndexRoute
   '/_app/p/$projectId': typeof AppPProjectIdRouteRouteWithChildren
   '/_app/billing_/fix-payment': typeof AppBillingFixPaymentRoute
@@ -617,11 +668,14 @@ export interface FileRoutesById {
   '/_app/settings/organization': typeof AppSettingsOrganizationRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/autumn/$': typeof ApiAutumnSplatRoute
+  '/e/$token/$widget': typeof ETokenWidgetRoute
+  '/e/$token/data': typeof ETokenDataRoute
   '/report-map/$grant/copyright': typeof ReportMapGrantCopyrightRoute
   '/s/$token/og.png': typeof STokenOgDotpngRoute
   '/s/$token/raw': typeof STokenRawRoute
   '/_app/settings/': typeof AppSettingsIndexRoute
   '/_authenticated/onboarding/': typeof AuthenticatedOnboardingIndexRoute
+  '/e/$token/': typeof ETokenIndexRoute
   '/s/$token/': typeof STokenIndexRoute
   '/_app/p/$projectId/ai-visibility': typeof AppPProjectIdAiVisibilityRouteWithChildren
   '/_app/p/$projectId/backlinks': typeof AppPProjectIdBacklinksRoute
@@ -662,6 +716,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth-error'
+    | '/connect'
     | '/forgot-password'
     | '/reset-password'
     | '/verify-email'
@@ -676,11 +731,13 @@ export interface FileRouteTypes {
     | '/sign-up'
     | '/oauth-consent'
     | '/subscribe'
-    | '/yc'
     | '/accept-invitation/$id'
+    | '/api/csp-report'
     | '/api/health'
     | '/api/privacy-region'
+    | '/api/sign-up-status'
     | '/r/$reportId'
+    | '/stripe-projects/login'
     | '/p/$projectId'
     | '/billing/fix-payment'
     | '/help/dataforseo-api-key'
@@ -688,11 +745,14 @@ export interface FileRouteTypes {
     | '/settings/organization'
     | '/api/auth/$'
     | '/api/autumn/$'
+    | '/e/$token/$widget'
+    | '/e/$token/data'
     | '/report-map/$grant/copyright'
     | '/s/$token/og.png'
     | '/s/$token/raw'
     | '/settings/'
     | '/onboarding/'
+    | '/e/$token/'
     | '/s/$token/'
     | '/p/$projectId/ai-visibility'
     | '/p/$projectId/backlinks'
@@ -731,6 +791,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/auth-error'
+    | '/connect'
     | '/forgot-password'
     | '/reset-password'
     | '/verify-email'
@@ -744,22 +805,27 @@ export interface FileRouteTypes {
     | '/sign-up'
     | '/oauth-consent'
     | '/subscribe'
-    | '/yc'
     | '/accept-invitation/$id'
+    | '/api/csp-report'
     | '/api/health'
     | '/api/privacy-region'
+    | '/api/sign-up-status'
     | '/r/$reportId'
+    | '/stripe-projects/login'
     | '/billing/fix-payment'
     | '/help/dataforseo-api-key'
     | '/help/openrouter-api-key'
     | '/settings/organization'
     | '/api/auth/$'
     | '/api/autumn/$'
+    | '/e/$token/$widget'
+    | '/e/$token/data'
     | '/report-map/$grant/copyright'
     | '/s/$token/og.png'
     | '/s/$token/raw'
     | '/settings'
     | '/onboarding'
+    | '/e/$token'
     | '/s/$token'
     | '/p/$projectId/backlinks'
     | '/p/$projectId/brand-lookup'
@@ -796,6 +862,7 @@ export interface FileRouteTypes {
     | '/_auth'
     | '/_authenticated'
     | '/auth-error'
+    | '/connect'
     | '/forgot-password'
     | '/reset-password'
     | '/verify-email'
@@ -810,11 +877,13 @@ export interface FileRouteTypes {
     | '/_auth/sign-up'
     | '/_authenticated/oauth-consent'
     | '/_authenticated/subscribe'
-    | '/_authenticated/yc'
     | '/accept-invitation/$id'
+    | '/api/csp-report'
     | '/api/health'
     | '/api/privacy-region'
+    | '/api/sign-up-status'
     | '/r/$reportId'
+    | '/stripe-projects/login'
     | '/_app/'
     | '/_app/p/$projectId'
     | '/_app/billing_/fix-payment'
@@ -823,11 +892,14 @@ export interface FileRouteTypes {
     | '/_app/settings/organization'
     | '/api/auth/$'
     | '/api/autumn/$'
+    | '/e/$token/$widget'
+    | '/e/$token/data'
     | '/report-map/$grant/copyright'
     | '/s/$token/og.png'
     | '/s/$token/raw'
     | '/_app/settings/'
     | '/_authenticated/onboarding/'
+    | '/e/$token/'
     | '/s/$token/'
     | '/_app/p/$projectId/ai-visibility'
     | '/_app/p/$projectId/backlinks'
@@ -869,20 +941,27 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRouteWithChildren
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   AuthErrorRoute: typeof AuthErrorRoute
+  ConnectRoute: typeof ConnectRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   VerifyEmailRoute: typeof VerifyEmailRoute
   Char91DotwellKnownChar93HttpMessageSignaturesDirectoryRoute: typeof Char91DotwellKnownChar93HttpMessageSignaturesDirectoryRoute
   Char91DotwellKnownChar93OpenaiAppsChallengeRoute: typeof Char91DotwellKnownChar93OpenaiAppsChallengeRoute
   AcceptInvitationIdRoute: typeof AcceptInvitationIdRoute
+  ApiCspReportRoute: typeof ApiCspReportRoute
   ApiHealthRoute: typeof ApiHealthRoute
   ApiPrivacyRegionRoute: typeof ApiPrivacyRegionRoute
+  ApiSignUpStatusRoute: typeof ApiSignUpStatusRoute
   RReportIdRoute: typeof RReportIdRoute
+  StripeProjectsLoginRoute: typeof StripeProjectsLoginRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiAutumnSplatRoute: typeof ApiAutumnSplatRoute
+  ETokenWidgetRoute: typeof ETokenWidgetRoute
+  ETokenDataRoute: typeof ETokenDataRoute
   ReportMapGrantCopyrightRoute: typeof ReportMapGrantCopyrightRoute
   STokenOgDotpngRoute: typeof STokenOgDotpngRoute
   STokenRawRoute: typeof STokenRawRoute
+  ETokenIndexRoute: typeof ETokenIndexRoute
   STokenIndexRoute: typeof STokenIndexRoute
   ApiGa4OauthCallbackRoute: typeof ApiGa4OauthCallbackRoute
   ApiGscOauthCallbackRoute: typeof ApiGscOauthCallbackRoute
@@ -918,6 +997,13 @@ declare module '@tanstack/react-router' {
       path: '/auth-error'
       fullPath: '/auth-error'
       preLoaderRoute: typeof AuthErrorRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/connect': {
+      id: '/connect'
+      path: '/connect'
+      fullPath: '/connect'
+      preLoaderRoute: typeof ConnectRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/forgot-password': {
@@ -1025,18 +1111,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSubscribeRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/yc': {
-      id: '/_authenticated/yc'
-      path: '/yc'
-      fullPath: '/yc'
-      preLoaderRoute: typeof AuthenticatedYcRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
     '/accept-invitation/$id': {
       id: '/accept-invitation/$id'
       path: '/accept-invitation/$id'
       fullPath: '/accept-invitation/$id'
       preLoaderRoute: typeof AcceptInvitationIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/csp-report': {
+      id: '/api/csp-report'
+      path: '/api/csp-report'
+      fullPath: '/api/csp-report'
+      preLoaderRoute: typeof ApiCspReportRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/health': {
@@ -1053,11 +1139,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPrivacyRegionRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/sign-up-status': {
+      id: '/api/sign-up-status'
+      path: '/api/sign-up-status'
+      fullPath: '/api/sign-up-status'
+      preLoaderRoute: typeof ApiSignUpStatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/r/$reportId': {
       id: '/r/$reportId'
       path: '/r/$reportId'
       fullPath: '/r/$reportId'
       preLoaderRoute: typeof RReportIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/stripe-projects/login': {
+      id: '/stripe-projects/login'
+      path: '/stripe-projects/login'
+      fullPath: '/stripe-projects/login'
+      preLoaderRoute: typeof StripeProjectsLoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_app/billing_/fix-payment': {
@@ -1121,6 +1221,27 @@ declare module '@tanstack/react-router' {
       path: '/api/autumn/$'
       fullPath: '/api/autumn/$'
       preLoaderRoute: typeof ApiAutumnSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/e/$token/': {
+      id: '/e/$token/'
+      path: '/e/$token'
+      fullPath: '/e/$token/'
+      preLoaderRoute: typeof ETokenIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/e/$token/$widget': {
+      id: '/e/$token/$widget'
+      path: '/e/$token/$widget'
+      fullPath: '/e/$token/$widget'
+      preLoaderRoute: typeof ETokenWidgetRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/e/$token/data': {
+      id: '/e/$token/data'
+      path: '/e/$token/data'
+      fullPath: '/e/$token/data'
+      preLoaderRoute: typeof ETokenDataRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/report-map/$grant/copyright': {
@@ -1561,14 +1682,12 @@ const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
 interface AuthenticatedRouteChildren {
   AuthenticatedOauthConsentRoute: typeof AuthenticatedOauthConsentRoute
   AuthenticatedSubscribeRoute: typeof AuthenticatedSubscribeRoute
-  AuthenticatedYcRoute: typeof AuthenticatedYcRoute
   AuthenticatedOnboardingIndexRoute: typeof AuthenticatedOnboardingIndexRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedOauthConsentRoute: AuthenticatedOauthConsentRoute,
   AuthenticatedSubscribeRoute: AuthenticatedSubscribeRoute,
-  AuthenticatedYcRoute: AuthenticatedYcRoute,
   AuthenticatedOnboardingIndexRoute: AuthenticatedOnboardingIndexRoute,
 }
 
@@ -1581,6 +1700,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRouteWithChildren,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   AuthErrorRoute: AuthErrorRoute,
+  ConnectRoute: ConnectRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   VerifyEmailRoute: VerifyEmailRoute,
@@ -1589,14 +1709,20 @@ const rootRouteChildren: RootRouteChildren = {
   Char91DotwellKnownChar93OpenaiAppsChallengeRoute:
     Char91DotwellKnownChar93OpenaiAppsChallengeRoute,
   AcceptInvitationIdRoute: AcceptInvitationIdRoute,
+  ApiCspReportRoute: ApiCspReportRoute,
   ApiHealthRoute: ApiHealthRoute,
   ApiPrivacyRegionRoute: ApiPrivacyRegionRoute,
+  ApiSignUpStatusRoute: ApiSignUpStatusRoute,
   RReportIdRoute: RReportIdRoute,
+  StripeProjectsLoginRoute: StripeProjectsLoginRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiAutumnSplatRoute: ApiAutumnSplatRoute,
+  ETokenWidgetRoute: ETokenWidgetRoute,
+  ETokenDataRoute: ETokenDataRoute,
   ReportMapGrantCopyrightRoute: ReportMapGrantCopyrightRoute,
   STokenOgDotpngRoute: STokenOgDotpngRoute,
   STokenRawRoute: STokenRawRoute,
+  ETokenIndexRoute: ETokenIndexRoute,
   STokenIndexRoute: STokenIndexRoute,
   ApiGa4OauthCallbackRoute: ApiGa4OauthCallbackRoute,
   ApiGscOauthCallbackRoute: ApiGscOauthCallbackRoute,
