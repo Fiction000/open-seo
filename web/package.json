@@ -8,7 +8,7 @@
     "build": "vite build && node scripts/generate-sitemap.js && node scripts/generate-social-cards.js",
     "build:app": "vite build",
     "sitemap": "node scripts/generate-sitemap.js",
-    "start": "wrangler dev",
+    "start": "WRANGLER_LOG_PATH=.wrangler/logs WRANGLER_REGISTRY_PATH=.wrangler/registry MINIFLARE_REGISTRY_PATH=.wrangler/registry WRANGLER_SEND_METRICS=false wrangler dev",
     "preview": "vite preview",
     "types:check": "fumadocs-mdx && tsc --noEmit",
     "format:check": "prettier --check .",
