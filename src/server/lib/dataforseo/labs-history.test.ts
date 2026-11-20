@@ -3,6 +3,7 @@ import { fetchDomainHistoricalRankOverview } from "@/server/lib/dataforseo/labs"
 
 vi.mock("@/server/lib/runtime-env", () => ({
   getRequiredEnvValue: vi.fn(async () => "test-api-key"),
+  getOptionalEnvValue: vi.fn(async () => undefined),
 }));
 
 describe("DataForSEO historical rank overview", () => {

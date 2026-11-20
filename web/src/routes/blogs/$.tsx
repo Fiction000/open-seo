@@ -1,13 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { createClientLoader } from "fumadocs-mdx/runtime/vite";
 import { DocsBody } from "fumadocs-ui/page";
 import defaultMdxComponents from "fumadocs-ui/mdx";
 import { SiteFooter } from "@/components/site-footer";
-import { BlogLayout, PostDate } from "@/components/blog-layout";
+import { PostDate } from "@/components/post-date";
 import type { ComponentPropsWithoutRef } from "react";
 import { Suspense } from "react";
 import { getBlogPost } from "@/lib/content.functions";
-import { blog } from "../../../.source/index";
+import browserCollections from "fumadocs-mdx:collections/browser";
 import { buildPageSeo } from "@/lib/seo";
 
 export const Route = createFileRoute("/blogs/$")({
@@ -34,7 +33,7 @@ export const Route = createFileRoute("/blogs/$")({
   component: BlogPost,
 });
 
-const clientMdxLoader = createClientLoader(blog, {
+const clientMdxLoader = browserCollections.blog.createClientLoader({
   id: "blog",
   component({ default: MDX }) {
     return (
@@ -89,10 +88,9 @@ function BlogPost() {
     author: string;
     date: string;
   };
-  const Content = clientMdxLoader.getComponent(data.path);
 
   return (
-    <BlogLayout>
+    <>
       <article className="fd-light mx-auto max-w-3xl px-6 py-12 text-neutral-950 md:py-24">
         <BlogHeader
           title={data.title}
@@ -100,9 +98,7 @@ function BlogPost() {
           author={data.author}
           date={data.date}
         />
-        <Suspense>
-          <Content />
-        </Suspense>
+        <Suspense>{clientMdxLoader.useContent(data.path)}</Suspense>
       </article>
 
       <div className="mx-auto max-w-5xl px-6 pb-12">
@@ -110,13 +106,14 @@ function BlogPost() {
           <SiteFooter className="text-xs text-neutral-600 [&_a]:transition-colors [&_a]:hover:text-neutral-900" />
         </div>
       </div>
-    </BlogLayout>
+    </>
   );
 }
 
 // Keyed by the `author` name in blog frontmatter.
 const authorXUrls = new Map([
   ["Ben Senescu", "https://x.com/bensenescu"],
+  ["Carter Smith", "https://x.com/carterwsmith"],
   ["Jeremy Rivera", "https://x.com/JeremyRiveraSEO"],
   ["Sohan Bhat", "https://x.com/sohanbhat2324"],
 ]);

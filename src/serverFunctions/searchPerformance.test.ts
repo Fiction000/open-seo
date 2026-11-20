@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { z } from "zod";
 import {
   exportSearchPerformanceTable,
+  getSearchPerformanceDetail,
   getSearchPerformanceReport,
   getSearchPerformanceTable,
 } from "./searchPerformance";
@@ -67,6 +68,29 @@ describe("Search Performance combined filters", () => {
     });
   });
 
+  it("reads Discover without queries: no striking-distance scan, query filter, or device filter", async () => {
+    await getSearchPerformanceReport({
+      data: { ...data, searchType: "discover" },
+    });
+
+    expect(getPerformance).toHaveBeenCalledTimes(3);
+    // Totals for both periods, then the country list; Google rejects a device
+    // filter on Discover and it has no queries, so both are dropped everywhere.
+    const discoverFilters = [filters[1], filters[3]];
+    for (const index of [0, 1]) {
+      expect(getPerformance.mock.calls[index][0]).toMatchObject({
+        type: "discover",
+        dimensions: ["date"],
+        filters: discoverFilters,
+      });
+    }
+    expect(getPerformance.mock.calls[2][0]).toMatchObject({
+      type: "discover",
+      dimensions: ["country"],
+      filters: discoverFilters.slice(0, 1),
+    });
+  });
+
   it.each(["query", "page"] as const)(
     "keeps %s pagination and exports on the same filtered dataset",
     async (dimension) => {
@@ -80,13 +104,40 @@ describe("Search Performance combined filters", () => {
         startRow: 25,
         rowLimit: 26,
       });
+      // The previous period, which each row's change in clicks is read from.
       expect(getPerformance.mock.calls[1][0]).toMatchObject({
+        dimensions: [dimension],
+        filters,
+      });
+      expect(getPerformance.mock.calls[2][0]).toMatchObject({
         dimensions: [dimension],
         filters,
         rowLimit: 1000,
       });
     },
   );
+
+  it("opens one page under the other filters, with its URL in place of the page text filter", async () => {
+    const key = "https://example.com/collections/mugs";
+    await getSearchPerformanceDetail({
+      data: { ...data, dimension: "page", key },
+    });
+    // Both periods' daily rows, then the queries the page ranks for.
+    expect(getPerformance).toHaveBeenCalledTimes(3);
+    for (const index of [0, 1, 2]) {
+      expect(getPerformance.mock.calls[index][0]).toMatchObject({
+        filters: [
+          filters[0],
+          { dimension: "page", operator: "equals", expression: key },
+          filters[2],
+          filters[3],
+        ],
+      });
+    }
+    expect(getPerformance.mock.calls[2][0]).toMatchObject({
+      dimensions: ["query"],
+    });
+  });
 
   it("reports the last-page row count instead of a full page for narrow filters", async () => {
     getPerformance.mockResolvedValue({

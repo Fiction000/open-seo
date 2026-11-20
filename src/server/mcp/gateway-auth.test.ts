@@ -22,6 +22,7 @@ vi.mock("@/server/features/projects/services/ProjectService", () => ({
 }));
 vi.mock("@/server/lib/runtime-env", () => ({
   getOptionalEnvValue: vi.fn(async () => undefined),
+  isEveryAppServerAuthMode: vi.fn(async () => false),
   isHostedServerAuthMode: vi.fn(async () => false),
 }));
 vi.mock("@/server/mcp/instrumentation", () => ({
@@ -30,6 +31,7 @@ vi.mock("@/server/mcp/instrumentation", () => ({
     _schema: unknown,
     handler: unknown,
   ) => handler,
+  instrumentMcpToolInput: (_name: string, schema: unknown) => schema,
 }));
 vi.mock("@/middleware/ensure-user/cloudflareAccess", () => ({
   resolveCloudflareAccessContext: vi.fn(),
@@ -101,9 +103,36 @@ function rpcRequest(method: string, params: unknown = {}, token?: string) {
     headers: {
       Accept: "application/json, text/event-stream",
       "Content-Type": "application/json",
+      ...(method === "initialize"
+        ? {}
+        : {
+            "MCP-Protocol-Version": "2026-07-28",
+            "Mcp-Method": method,
+            ...(typeof params === "object" &&
+            params !== null &&
+            "name" in params &&
+            typeof params.name === "string"
+              ? { "Mcp-Name": params.name }
+              : {}),
+          }),
       ...(token ? { "cf-access-jwt-assertion": token } : {}),
     },
-    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method,
+      params: {
+        ...(typeof params === "object" && params !== null ? params : {}),
+        ...(method === "initialize"
+          ? {}
+          : {
+              _meta: {
+                "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+                "io.modelcontextprotocol/clientCapabilities": {},
+              },
+            }),
+      },
+    }),
   });
 }
 
@@ -159,16 +188,16 @@ describe("OpenSEO machine MCP HTTP authentication", () => {
     const whoamiBody = z
       .object({
         result: z.object({
-          structuredContent: z.record(z.string(), z.unknown()),
+          content: z.array(z.object({ text: z.string() })),
         }),
       })
       .parse(await whoami.json());
-    expect(whoamiBody.result.structuredContent).toMatchObject({
-      userEmail: "litellm-gateway@openseo.invalid",
-      scopes: ["mcp:read"],
-      mode: "self-hosted",
-      creditsRemaining: null,
-    });
+    const whoamiText = whoamiBody.result.content
+      .map((item) => item.text)
+      .join("\n");
+    expect(whoamiText).toContain("litellm-gateway@openseo.invalid");
+    expect(whoamiText).toContain("Scopes: mcp:read");
+    expect(whoamiText).toContain("Mode: self-hosted");
 
     const projects = await handle(
       "tools/call",
@@ -179,11 +208,13 @@ describe("OpenSEO machine MCP HTTP authentication", () => {
     const projectBody = z
       .object({
         result: z.object({
-          structuredContent: z.object({ projects: z.array(z.unknown()) }),
+          content: z.array(z.object({ text: z.string() })),
         }),
       })
       .parse(await projects.json());
-    expect(projectBody.result.structuredContent.projects).toEqual([]);
+    expect(
+      projectBody.result.content.map((item) => item.text).join("\n"),
+    ).toContain("No projects yet.");
     expect(ProjectService.listProjects).toHaveBeenCalledWith(
       "shared-workspace",
     );
@@ -300,11 +331,23 @@ describe("OpenSEO machine MCP HTTP authentication", () => {
       headers: {
         Accept: "application/json, text/event-stream",
         "Content-Type": "application/json",
+        "MCP-Protocol-Version": "2026-07-28",
+        "Mcp-Method": "tools/list",
         "cf-access-jwt-assertion": token,
         "x-forwarded-host": "other.example.test",
         "x-forwarded-proto": "http",
       },
-      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "tools/list",
+        params: {
+          _meta: {
+            "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+            "io.modelcontextprotocol/clientCapabilities": {},
+          },
+        },
+      }),
     });
     const response = await handleSelfHostedOpenSeoMcpRequest(
       request,

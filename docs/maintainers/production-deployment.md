@@ -16,25 +16,29 @@ deployment branches to `main`. Then add the following.
 
 ### Secrets
 
-| Secret                       | Purpose                                                            |
-| ---------------------------- | ------------------------------------------------------------------ |
-| `CLOUDFLARE_API_TOKEN`       | Alchemy deployment and remote state authentication                 |
-| `POSTGRES_DATABASE_URL`      | Drizzle migrations against the same database Hyperdrive fronts     |
-| `DATAFORSEO_API_KEY`         | base64 `login:password` (not the dashboard key)                    |
-| `BETTER_AUTH_SECRET`         | Must be the existing value: it encrypts stored Google OAuth tokens |
-| `CRAWLER_ACCESS_SECRET`      | Must be the existing value: it encrypts stored crawler signatures  |
-| `GOOGLE_CLIENT_SECRET`       | Hosted Google sign-in and Search Console / GA4 OAuth               |
-| `TURNSTILE_SECRET_KEY`       | Signup captcha verification                                        |
-| `LOOPS_API_KEY`              | Transactional email and contact sync                               |
-| `AUTUMN_SECRET_KEY`          | Billing                                                            |
-| `AUTUMN_WEBHOOK_SECRET`      | Billing webhook verification                                       |
-| `OPENROUTER_API_KEY`         | SAM chat agent (optional)                                          |
-| `DUB_API_KEY`                | Referral tracking (optional)                                       |
-| `CONTEXT_API_KEY`            | Site audit JavaScript rendering fallback (optional)                |
-| `META_CONVERSIONS_API_TOKEN` | Meta ad signup attribution (optional)                              |
-| `GDPR_ERASURE_SECRET`        | `scripts/erase-user-data.ts` endpoint (optional)                   |
-| `GOOGLE_MAPS_API_KEY`        | Local SEO basemap tiles (optional)                                 |
-| `WEB_BOT_AUTH_JWK`           | Private Ed25519 JWK that signs site audit requests (optional)      |
+| Secret                             | Purpose                                                            |
+| ---------------------------------- | ------------------------------------------------------------------ |
+| `CLOUDFLARE_API_TOKEN`             | Alchemy deployment and remote state authentication                 |
+| `POSTGRES_DATABASE_URL`            | Drizzle migrations against the same database Hyperdrive fronts     |
+| `DATAFORSEO_API_KEY`               | base64 `login:password` (not the dashboard key)                    |
+| `BETTER_AUTH_SECRET`               | Must be the existing value: it encrypts stored Google OAuth tokens |
+| `CRAWLER_ACCESS_SECRET`            | Must be the existing value: it encrypts stored crawler signatures  |
+| `GOOGLE_CLIENT_SECRET`             | Hosted Google sign-in and Search Console / GA4 OAuth               |
+| `TURNSTILE_SECRET_KEY`             | Signup captcha verification                                        |
+| `OPENAI_SIWC_CLIENT_SECRET`        | Sign in with ChatGPT, confidential clients only (optional)         |
+| `LOOPS_API_KEY`                    | Transactional email and contact sync                               |
+| `AUTUMN_SECRET_KEY`                | Billing                                                            |
+| `AUTUMN_WEBHOOK_SECRET`            | Billing webhook verification                                       |
+| `OPENROUTER_API_KEY`               | SAM chat agent (optional)                                          |
+| `DUB_API_KEY`                      | Referral tracking (optional)                                       |
+| `CONTEXT_API_KEY`                  | Site audit JavaScript rendering fallback (optional)                |
+| `META_CONVERSIONS_API_TOKEN`       | Meta ad signup attribution (optional)                              |
+| `POSTHOG_ACCOUNT_DELETION_API_KEY` | Account deletion: deletes the PostHog person (person read + write) |
+| `GOOGLE_MAPS_API_KEY`              | Local SEO basemap tiles (optional)                                 |
+| `WEB_BOT_AUTH_JWK`                 | Private Ed25519 JWK that signs site audit requests (optional)      |
+| `STRIPE_PROJECTS_SIGNING_SECRET`   | Stripe Projects provisioning signatures (optional; unset = off)    |
+| `TRUSTPILOT_API_KEY`               | Trustpilot review invitations (optional)                           |
+| `TRUSTPILOT_API_SECRET`            | Trustpilot review invitations (optional)                           |
 
 `WEB_BOT_AUTH_JWK` is one line of JSON (the whitespace check below rejects a
 pretty-printed key). Generate it once with:
@@ -56,28 +60,62 @@ optional ones simply turn their feature off.
 
 The Cloudflare token needs the permissions the Alchemy stack already uses:
 Workers scripts, D1, KV, R2, Workflows, custom-domain management, Account
-Settings Read, and Secrets Store Read (Alchemy fetches its state-store token
-from the account Secrets Store each run, so no extra GitHub secret is needed).
+Settings Read, and Secrets Store Edit. Alchemy reads its state-store token from
+the account Secrets Store each run through a temporary Secrets Store binding,
+and Cloudflare requires Edit to bind a secret; Read fails with "Secrets store
+binding authorization failed".
 
 ### Variables
 
-| Variable                                | Value                                          |
-| --------------------------------------- | ---------------------------------------------- |
-| `CLOUDFLARE_ACCOUNT_ID`                 | Production account ID                          |
-| `HYPERDRIVE_ID`                         | Existing `openseo` Hyperdrive configuration ID |
-| `GOOGLE_CLIENT_ID`                      | Existing Google OAuth client ID                |
-| `TURNSTILE_SITE_KEY`                    | Existing public Turnstile site key             |
-| `LOOPS_TRANSACTIONAL_VERIFY_EMAIL_ID`   | Verification template ID                       |
-| `LOOPS_TRANSACTIONAL_RESET_PASSWORD_ID` | Password-reset template ID                     |
-| `LOOPS_TRANSACTIONAL_INVITATION_ID`     | Invitation template ID                         |
-| `LOOPS_PRODUCT_UPDATES_LIST_ID`         | Product-updates mailing list ID; optional      |
-| `META_PIXEL_ID`                         | Meta pixel ID for signup attribution; optional |
-| `POSTHOG_PUBLIC_KEY`, `POSTHOG_HOST`    | Existing analytics configuration; optional     |
-| `OPENROUTER_MODEL`                      | Optional model override                        |
-| `OPENSEO_TELEMETRY_DISABLED`            | Optional telemetry setting                     |
+| Variable                                  | Value                                               |
+| ----------------------------------------- | --------------------------------------------------- |
+| `CLOUDFLARE_ACCOUNT_ID`                   | Production account ID                               |
+| `HYPERDRIVE_ID`                           | Existing `openseo` Hyperdrive configuration ID      |
+| `GOOGLE_CLIENT_ID`                        | Existing Google OAuth client ID                     |
+| `TURNSTILE_SITE_KEY`                      | Existing public Turnstile site key                  |
+| `OPENAI_SIWC_CLIENT_ID`                   | OpenAI client ID for Sign in with ChatGPT; optional |
+| `LOOPS_TRANSACTIONAL_VERIFY_EMAIL_ID`     | Verification template ID                            |
+| `LOOPS_TRANSACTIONAL_RESET_PASSWORD_ID`   | Password-reset template ID                          |
+| `LOOPS_TRANSACTIONAL_INVITATION_ID`       | Invitation template ID                              |
+| `LOOPS_TRANSACTIONAL_ACCOUNT_DELETION_ID` | Account deletion confirmation template ID           |
+| `POSTHOG_PROJECT_ID`                      | PostHog project, for account deletion               |
+| `LOOPS_PRODUCT_UPDATES_LIST_ID`           | Product-updates mailing list ID; optional           |
+| `META_PIXEL_ID`                           | Meta pixel ID for signup attribution; optional      |
+| `POSTHOG_PUBLIC_KEY`                      | Existing analytics key; optional                    |
+| `POSTHOG_HOST`                            | Existing analytics ingestion host                   |
+| `OPENROUTER_MODEL`                        | Optional model override                             |
+| `OPENSEO_TELEMETRY_DISABLED`              | Optional telemetry setting                          |
+| `TRUSTPILOT_BUSINESS_UNIT_ID`             | Trustpilot business unit; optional                  |
+| `TRUSTPILOT_BUSINESS_USER_ID`             | Trustpilot business user; optional                  |
+| `TRUSTPILOT_TEMPLATE_ID`                  | Trustpilot invitation template; optional            |
+
+How to create the account deletion keys is in
+[account-deletion.md](account-deletion.md#setting-it-up-in-github).
 
 The workflow fixes `AUTH_MODE=hosted`, `DATABASE_PROVIDER=postgres`,
 `BETTER_AUTH_URL=https://app.openseo.so`, and email verification enabled.
+
+### Sign in with ChatGPT
+
+Optional. With `OPENAI_SIWC_CLIENT_ID` unset there is no "Continue with
+ChatGPT" button and nothing else changes. The client ID is inlined into the
+client build and read by the Worker, so it takes a deploy to set. In production
+the button also stays hidden, and the server refuses ChatGPT sign-ins, until
+the `chatgpt-sign-in` feature flag is on
+(Cloudflare dashboard, no deploy): leave it off until OpenAI approves the app,
+because before that OpenAI turns away everyone but the app's developers. Register
+`https://app.openseo.so/api/auth/oauth2/callback/chatgpt` with OpenAI as the
+redirect URI. Set `OPENAI_SIWC_CLIENT_SECRET` only when OpenAI registered the
+client as confidential (`client_secret_basic`); a public client has no secret.
+
+ChatGPT's own connect window can offer "Continue with ChatGPT" next to "Sign in
+with OpenSEO". OpenAI's partnerships team turns that on; there is no dashboard
+setting. ChatGPT then adds `target_flow=chatgpt_siwc` to the connector's
+authorize request, and the sign-in page starts the ChatGPT sign-in without
+another click.
+
+OpenAI's account security notifications (back-channel logout) are not
+implemented, so leave "Automatic logout" off in OpenAI Platform.
 
 ### Hyperdrive
 

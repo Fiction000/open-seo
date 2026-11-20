@@ -141,8 +141,11 @@ export const createGatewayRankTrackerTool = {
       scheduleInterval,
     });
     const added = await RankTrackingService.addKeywords(
-      config.id,
-      args.projectId,
+      {
+        configId: config.id,
+        projectId: args.projectId,
+        organizationId: context.auth.organizationId,
+      },
       keywords,
       {
         kind: "credit_ceiling",

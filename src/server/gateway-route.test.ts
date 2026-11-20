@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import worker from "@/server.ts";
 
+vi.mock("cloudflare:workers", () => ({ env: {}, waitUntil: vi.fn() }));
 const { transportSpy, downloadSpy, assetsSpy } = vi.hoisted(() => ({
   transportSpy: vi.fn(async () => new Response("mcp", { status: 200 })),
   downloadSpy: vi.fn(async () => new Response("download", { status: 200 })),
@@ -34,11 +35,14 @@ vi.mock("@/server/billing/subscription", () => ({
   getOrCreateOrganizationCustomer: vi.fn(),
 }));
 vi.mock("@/server/lib/runtime-env", () => ({
+  getOptionalEnvValue: vi.fn(async () => undefined),
   isHostedServerAuthMode: vi.fn(async () => false),
 }));
 vi.mock("@/lib/auth-mode", () => ({
   getAuthMode: (value: string | undefined) => value ?? "cloudflare_access",
   isHostedAuthMode: (value: string) => value === "hosted",
+  setRuntimeAuthMode: vi.fn(),
+  usesBetterAuth: (value: string) => value === "hosted",
 }));
 vi.mock("@/server/mcp/oauth-provider", () => ({
   createOpenSeoOAuthProvider: () => ({
@@ -73,6 +77,9 @@ vi.mock("@/shared/gdpr-erasure", () => ({
 }));
 vi.mock("@/server/features/ai-visibility/services/aiVisibilityExport", () => ({
   handleAiVisibilityDownload: downloadSpy,
+}));
+vi.mock("@/server/lib/dataforseo/request-slots", () => ({
+  withDataforseoSlots: (callback: () => unknown) => callback(),
 }));
 vi.mock("@/server/mcp/transport", () => ({
   handleAuthenticatedOpenSeoMcpRequest: vi.fn(),

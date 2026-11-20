@@ -113,8 +113,11 @@ describe("create_gateway_rank_tracker", () => {
       .parse(result.structuredContent);
     expect(estimatedMonthlyCostUsd).toBeLessThanOrEqual(0.26);
     expect(mocks.addKeywords).toHaveBeenCalledWith(
-      "tracker-1",
-      projectId,
+      {
+        configId: "tracker-1",
+        projectId,
+        organizationId: "org_123",
+      },
       keywords,
       {
         kind: "credit_ceiling",

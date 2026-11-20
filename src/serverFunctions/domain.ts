@@ -8,6 +8,7 @@ import {
   domainPagesPageRequestSchema,
 } from "@/types/schemas/domain";
 import { DomainService } from "@/server/features/domain/services/DomainService";
+import { recordResearchStep } from "@/server/features/activation/researchActivation";
 import { resolveLabsMarket } from "@/shared/keyword-locations";
 
 function shouldUseDomainE2eFixtures() {
@@ -32,7 +33,9 @@ export const getDomainOverview = createServerFn({ method: "POST" })
       return fixtures.getFixtureOverview(input.domain);
     }
 
-    return DomainService.getOverview(input, context);
+    const overview = await DomainService.getOverview(input, context);
+    await recordResearchStep(context.projectId, "competitor");
+    return overview;
   });
 
 export const getDomainHistory = createServerFn({ method: "POST" })

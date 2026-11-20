@@ -32,8 +32,6 @@ const domainOverviewResultSchema = z.object({
   domain: z.string(),
   organicTraffic: z.number().nullable(),
   organicKeywords: z.number().nullable(),
-  backlinks: z.number().nullable(),
-  referringDomains: z.number().nullable(),
   hasData: z.boolean(),
   fetchedAt: z.string(),
 });
@@ -116,8 +114,6 @@ async function getOverview(
     domain,
     organicTraffic,
     organicKeywords,
-    backlinks: null,
-    referringDomains: null,
     hasData: organicKeywords != null && organicKeywords > 0,
     fetchedAt: nowIso,
   };

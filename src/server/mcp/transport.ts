@@ -7,7 +7,7 @@ import {
   originValidationResponse,
   WebStandardStreamableHTTPServerTransport,
 } from "@modelcontextprotocol/server";
-import { getHostedBaseUrl } from "@/lib/auth";
+import { getAuth, getHostedBaseUrl } from "@/lib/auth";
 import { MCP_SCOPE } from "@/lib/oauth-resource";
 import { resolveCloudflareAccessContext } from "@/middleware/ensure-user/cloudflareAccess";
 import { resolveLocalNoAuthContext } from "@/middleware/ensure-user/delegated";
@@ -27,7 +27,8 @@ import { getPublicOrigin } from "@/server/mcp/public-origin";
 import { createOpenSeoMcpServer } from "@/server/mcp/server";
 import { supportsMcpApps } from "@/server/mcp/ui-capabilities";
 import { AuthRepository } from "@/server/auth/repositories/AuthRepository";
-import { resolveExistingActiveHostedOrganization } from "@/server/auth/default-hosted-organization";
+import { GuestAccountRepository } from "@/server/auth/repositories/GuestAccountRepository";
+import { resolveActiveHostedOrganization } from "@/server/auth/default-hosted-organization";
 import {
   PERSONAL_MCP_PATH,
   personalMcpHttpError,
@@ -189,7 +190,9 @@ async function resolveRequestOrganization(
 ) {
   const membership = await AuthRepository.getMembership(userId, organizationId);
   if (membership) return { organizationId, role: membership.role };
-  return resolveExistingActiveHostedOrganization(userId);
+  return resolveActiveHostedOrganization(userId, (body) =>
+    getAuth().api.createOrganization({ body }),
+  );
 }
 
 async function handleAuthenticatedOpenSeoMcpRequestImpl(
@@ -220,7 +223,18 @@ async function handleAuthenticatedOpenSeoMcpRequestImpl(
   // so the grant can outlive the membership (member removed, org changed).
   // Re-resolve per request; 401 invalid_token only once the user belongs to
   // no organization, pushing compliant clients back through OAuth.
-  const authContext = result.data[MCP_AUTH_CONTEXT_PROP];
+  const tokenAuthContext = result.data[MCP_AUTH_CONTEXT_PROP];
+  const claimedUser = tokenAuthContext.guestClaimToken
+    ? await GuestAccountRepository.findClaimingUser(tokenAuthContext.userId)
+    : null;
+  const authContext = claimedUser
+    ? {
+        ...tokenAuthContext,
+        userId: claimedUser.userId,
+        userEmail: claimedUser.email,
+        guestClaimToken: undefined,
+      }
+    : tokenAuthContext;
   const organization = await resolveRequestOrganization(
     authContext.userId,
     authContext.organizationId,

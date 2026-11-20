@@ -12,24 +12,30 @@ export function DimensionSection({
   projectId,
   tableQuery,
   keyLabel,
+  showPosition,
   page,
   pageSize,
   onPageChange,
   onPageSizeChange,
   isFiltered,
   onClearFilters,
+  selectedKey,
+  onSelect,
 }: {
   projectId: string;
   tableQuery: UseQueryResult<
     Awaited<ReturnType<typeof getSearchPerformanceTable>>
   >;
   keyLabel: string;
+  showPosition: boolean;
   page: number;
   pageSize: number;
   onPageChange: (page: number) => void;
   onPageSizeChange: (pageSize: number) => void;
   isFiltered: boolean;
   onClearFilters: () => void;
+  selectedKey: string | null;
+  onSelect: (key: string) => void;
 }) {
   if (tableQuery.isPending) {
     return <SkeletonTableRows className="p-4" />;
@@ -68,10 +74,13 @@ export function DimensionSection({
         <DimensionTable
           rows={tableData.rows}
           keyLabel={keyLabel}
+          showPosition={showPosition}
           isFiltered={isFiltered}
           isPastEnd={isPastEnd}
           onClearFilters={onClearFilters}
           onFirstPage={() => onPageChange(1)}
+          selectedKey={selectedKey}
+          onSelect={onSelect}
         />
       </div>
       {!isPastEnd && (

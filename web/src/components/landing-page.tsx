@@ -12,9 +12,15 @@ import {
   useRef,
   useState,
 } from "react";
+import { AddToAgentLinks } from "@/components/add-to-agent-links";
 import { NewsletterSignup } from "@/components/newsletter-signup";
 import { ProductHuntLaurel } from "@/components/product-hunt-laurel";
 import { SiteFooter } from "@/components/site-footer";
+import {
+  hasTrustpilotReviews,
+  TrustpilotRating,
+  TrustpilotReviews,
+} from "@/components/trustpilot";
 import { featurePages } from "@/lib/feature-pages";
 import { getAgentSetupPrompt } from "../../../src/client/features/ai-mcp/agentSetupPrompt";
 import "./landing-page.css";
@@ -247,6 +253,7 @@ function Hero() {
               <p className="itc-hero-cta-note">No credit card required</p>
             </div>
           </div>
+          <TrustpilotRating className="itc-hero-rating" />
         </Container>
       </section>
       <div className="itc-hero-followup">
@@ -267,7 +274,7 @@ function Hero() {
 // ─── Testimonial (true-black inverse strip) ──────────────────────────
 
 export function Testimonials({
-  title = "Trusted by 3,000+ entrepreneurs",
+  title = "Trusted by 8,000+ entrepreneurs",
   items = TESTIMONIALS,
 }: {
   title?: string;
@@ -329,6 +336,29 @@ export function Testimonials({
               </figure>
             ))}
           </div>
+        </div>
+      </Container>
+    </section>
+  );
+}
+
+// ─── Trustpilot reviews (same band as the testimonials) ──────────────
+
+function TrustpilotSection() {
+  return (
+    <section className="itc-inverse">
+      <Container>
+        <div className="itc-testimonials">
+          <h2
+            className="itc-display-md itc-testimonials-title"
+            style={{ margin: "0 auto" }}
+          >
+            Trusted by 8,000+ entrepreneurs
+          </h2>
+          <p className="itc-testimonials-rating">
+            <TrustpilotRating />
+          </p>
+          <TrustpilotReviews layout="carousel" />
         </div>
       </Container>
     </section>
@@ -558,8 +588,11 @@ function McpSection() {
             <h2 className="itc-display-lg">Get superpowers with the MCP</h2>
             <SkillsList />
             <AgentIcons />
-            <div className="itc-mcp-ctas">
-              <CopySetupPrompt />
+            <div className="itc-mcp-ctas itc-mcp-ctas-stack">
+              <div className="itc-mcp-actions">
+                <CopySetupPrompt />
+                <AddToAgentLinks className="itc-btn itc-btn-secondary" />
+              </div>
               <a href="/docs/agent-setup" className="itc-textlink">
                 Setup guide <IconArrowRight size={15} className="itc-arrow" />
               </a>
@@ -1083,7 +1116,8 @@ export function OpenSourceSection() {
             Star on GitHub
           </a>
           <a href="/open-source-seo" className="itc-textlink">
-            Why Open Source? <IconArrowRight size={15} className="itc-arrow" />
+            The open source alternative to Semrush and Ahrefs{" "}
+            <IconArrowRight size={15} className="itc-arrow" />
           </a>
         </div>
       </Container>
@@ -1148,7 +1182,7 @@ export function LandingPage() {
     <div className="itc">
       <Hero />
       <McpSection />
-      <Testimonials />
+      {hasTrustpilotReviews ? <TrustpilotSection /> : <Testimonials />}
       <BeyondDataSection />
       <OpenSourceSection />
       <ProductSection />

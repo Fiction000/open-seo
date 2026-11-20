@@ -42,7 +42,10 @@ import {
 } from "@/server/mcp/growth-auth";
 import { objectSchema } from "@/server/mcp/output-schemas";
 import { memoizeJsonSchema } from "@/server/mcp/json-schema-memo";
-import { instrumentMcpToolHandler } from "@/server/mcp/instrumentation";
+import {
+  instrumentMcpToolHandler,
+  instrumentMcpToolInput,
+} from "@/server/mcp/instrumentation";
 import { submitIndexNowUrlsTool } from "@/server/mcp/tools/submit-indexnow-urls";
 import { getBacklinksOverviewTool } from "@/server/mcp/tools/get-backlinks-overview";
 import { getBacklinksProfileTool } from "@/server/mcp/tools/get-backlinks-profile";
@@ -94,6 +97,9 @@ import {
 } from "@/server/mcp/tools/project-context";
 import { listSavedKeywordsTool } from "@/server/mcp/tools/list-saved-keywords";
 import { removeSavedKeywordsTool } from "@/server/mcp/tools/remove-saved-keywords";
+import { getSuggestedKeywordsTool } from "@/server/mcp/tools/get-suggested-keywords";
+import { getRankHistoryTool } from "@/server/mcp/tools/get-rank-history";
+import { updateAiResearchKeywordsTool } from "@/server/mcp/tools/update-ai-research-keywords";
 import {
   findSerpCompetitorsTool,
   getGoogleBusinessQuestionsTool,
@@ -129,6 +135,7 @@ import {
 } from "@/server/mcp/tools/search-console-tools";
 import {
   getAuditIssuesTool,
+  getAuditLighthouseTool,
   getAuditPagesTool,
   getAuditStatusTool,
   runSiteAuditTool,
@@ -146,24 +153,24 @@ import { getDataforseoBalanceTool } from "@/server/mcp/tools/get-dataforseo-bala
 import { explorePromptTool } from "@/server/mcp/tools/explore-prompt";
 import { registerWidgetResource } from "@/server/mcp/widget-resource";
 import { rememberWidgetResult } from "@/server/mcp/widget-results";
-import { WidgetTool } from "@/shared/mcp-contracts";
+import { MCP_WIDGET_TOOLS } from "@/shared/mcp-contracts";
 import {
   showSearchConsolePerformanceTool,
   showSerpResultsTool,
 } from "@/server/mcp/tools/widget-tools";
 
-type ToolSchema = z.ZodType | z.ZodRawShape;
+export type ToolSchema = z.ZodType | z.ZodRawShape;
 
 // Tools declare inputSchema as either a raw Zod shape (most tools) or a full
 // z.object (the GA4 tools); both normalize to one object schema at
 // registration.
-type ToolArgs<Input extends ToolSchema> = Input extends z.ZodType
+export type ToolArgs<Input extends ToolSchema> = Input extends z.ZodType
   ? z.infer<Input>
   : Input extends z.ZodRawShape
     ? z.infer<z.ZodObject<Input>>
     : never;
 
-type OpenSeoToolDefinition<Input extends ToolSchema> = {
+export type OpenSeoToolDefinition<Input extends ToolSchema> = {
   name: string;
   config: {
     title?: string;
@@ -179,7 +186,7 @@ type OpenSeoToolDefinition<Input extends ToolSchema> = {
   ) => CallToolResult | Promise<CallToolResult>;
 };
 
-const widgetToolName = z.enum(WidgetTool);
+const widgetToolName = z.enum(MCP_WIDGET_TOOLS);
 
 type ToolSchemas = {
   // Handed to the SDK, which converts them to JSON Schema for tools/list.
@@ -245,7 +252,11 @@ function registerOpenSeoTool<Input extends ToolSchema>(
     tool.name,
     {
       ...tool.config,
-      inputSchema: schemas.inputSchema,
+      inputSchema: instrumentMcpToolInput(
+        tool.name,
+        schemas.inputSchema,
+        authProps,
+      ),
       outputSchema: schemas.outputSchema,
     },
     async (args, context) => {
@@ -284,6 +295,99 @@ function registerOpenSeoTool<Input extends ToolSchema>(
       );
     },
   );
+}
+
+/** Shared catalog for the Every App tool lane. */
+export function registerOpenSeoTools(
+  register: <Input extends ToolSchema>(
+    tool: OpenSeoToolDefinition<Input>,
+  ) => void,
+) {
+  register(whoamiTool);
+  register(listProjectsTool);
+  register(createProjectTool);
+  register(researchProjectWebsiteTool);
+  register(saveProjectWebsiteSetupTool);
+  register(getProjectContextTool);
+  register(updateProjectContextTool);
+  register(listSavedKeywordsTool);
+  register(removeSavedKeywordsTool);
+  register(getSuggestedKeywordsTool);
+  register(researchKeywordsTool);
+  register(saveKeywordsTool);
+  register(getDomainOverviewTool);
+  register(getDomainKeywordSuggestionsTool);
+  register(getBacklinksOverviewTool);
+  register(getBacklinksProfileTool);
+  register(getSerpResultsTool);
+  register(searchSerpLocationsTool);
+  register(getAiVisibilityTrackerTool);
+  register(explorePromptTool);
+  register(generateAiVisibilityPromptsTool);
+  register(researchAiVisibilityPromptsTool);
+  register(completeAiResearchSetupTool);
+  register(updateAiResearchKeywordsTool);
+  register(saveAiVisibilityTrackerTool);
+  register(estimateAiVisibilityCostTool);
+  register(setAiVisibilityScheduleTool);
+  register(runAiVisibilityCheckTool);
+  register(getAiVisibilityRunTool);
+  register(getAiVisibilityResultsTool);
+  register(getAiVisibilityAnswerTool);
+  register(getAiVisibilitySourcesTool);
+  register(getAiVisibilityTrendTool);
+  register(exportAiVisibilityDataTool);
+  register(createRankTrackerTool);
+  register(getRankTrackerTool);
+  register(getRankHistoryTool);
+  register(addRankTrackingKeywordsTool);
+  register(removeRankTrackingKeywordsTool);
+  register(pinRankTrackingKeywordsTool);
+  register(estimateRankTrackerCostTool);
+  register(runRankTrackerTool);
+  register(getRankedKeywordsTool);
+  register(findSerpCompetitorsTool);
+  register(searchLocalBusinessesTool);
+  register(getLocalSerpResultsTool);
+  register(getGoogleBusinessQuestionsTool);
+  register(getBusinessProfileTool);
+  register(getBusinessReviewsTool);
+  register(getBusinessUpdatesTool);
+  register(listBusinessCategoriesTool);
+  register(getLocalRankGridTool);
+  register(getKeywordMetricsTool);
+  register(listSearchConsoleSitesTool);
+  register(setSearchConsoleSiteTool);
+  register(getSearchConsolePerformanceTool);
+  register(inspectUrlsTool);
+  register(submitIndexNowUrlsTool);
+  register(listGoogleAnalyticsPropertiesTool);
+  register(setGoogleAnalyticsPropertyTool);
+  register(getGoogleAnalyticsOrganicLandingPagesTool);
+  register(getGoogleAnalyticsPagePerformanceTool);
+  register(getGoogleAnalyticsKeyEventsTool);
+  register(getSearchOpportunitiesTool);
+  register(getGoogleAnalyticsOrganicOverviewTool);
+  register(getGoogleAnalyticsTrafficAcquisitionTool);
+  register(getGoogleAnalyticsMeasurementHealthTool);
+  register(getGoogleAnalyticsEcommercePerformanceTool);
+  register(getGoogleAnalyticsSiteSearchTool);
+  register(getGoogleAnalyticsAudienceBreakdownTool);
+  register(runSiteAuditTool);
+  register(listSiteAuditsTool);
+  register(deleteSiteAuditTool);
+  register(getAuditStatusTool);
+  register(getAuditIssuesTool);
+  register(getAuditPagesTool);
+  register(getAuditLighthouseTool);
+  register(saveReportTool);
+  register(listReportsTool);
+  register(getReportTool);
+  register(setReportSharingTool);
+  register(deleteReportTool);
+  register(listReportTemplatesTool);
+  register(saveReportTemplateTool);
+  register(deleteReportTemplateTool);
 }
 
 export function createOpenSeoMcpServer(
@@ -394,6 +498,7 @@ export function createOpenSeoMcpServer(
   }
   register(listSavedKeywordsTool);
   register(removeSavedKeywordsTool);
+  register(getSuggestedKeywordsTool);
   register(researchKeywordsTool);
   register(saveKeywordsTool);
   register(getDomainOverviewTool);
@@ -408,6 +513,7 @@ export function createOpenSeoMcpServer(
   register(generateAiVisibilityPromptsTool);
   register(researchAiVisibilityPromptsTool);
   register(completeAiResearchSetupTool);
+  register(updateAiResearchKeywordsTool);
   register(saveAiVisibilityTrackerTool);
   register(estimateAiVisibilityCostTool);
   register(setAiVisibilityScheduleTool);
@@ -420,6 +526,7 @@ export function createOpenSeoMcpServer(
   register(exportAiVisibilityDataTool);
   register(createRankTrackerTool);
   register(getRankTrackerTool);
+  register(getRankHistoryTool);
   register(addRankTrackingKeywordsTool);
   register(removeRankTrackingKeywordsTool);
   register(pinRankTrackingKeywordsTool);
@@ -460,6 +567,7 @@ export function createOpenSeoMcpServer(
   register(getAuditStatusTool);
   register(getAuditIssuesTool);
   register(getAuditPagesTool);
+  register(getAuditLighthouseTool);
   register(saveReportTool);
   register(listReportsTool);
   register(getReportTool);

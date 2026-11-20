@@ -1,19 +1,35 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarDays, List, Pencil, Play } from "lucide-react";
+import { CalendarDays, Grid3x3, List, Pencil, Play } from "lucide-react";
 import { getLocalTracker, startLocalCheck } from "@/serverFunctions/local-seo";
 import { QueryError, QueryState } from "@/client/components/QueryState";
 import { ConfirmDialog } from "@/client/components/ConfirmDialog";
 import { SegmentedToggle } from "@/client/components/SegmentedToggle";
 import { Button } from "@/client/components/ui/button";
 import { Card } from "@/client/components/ui/card";
-import { isLocalScanActive, LocalScanStatus } from "@/shared/local-seo";
+import { Progress } from "@/client/components/ui/progress";
+import { Spinner } from "@/client/components/ui/spinner";
+import {
+  isLocalScanActive,
+  localAreaLabel,
+  LocalScanStatus,
+} from "@/shared/local-seo";
+import { LocalAreaDialog } from "./LocalAreaDialog";
 import { LocalKeywordMap } from "./LocalKeywordMap";
 import { LocalKeywordsDialog } from "./LocalKeywordsDialog";
 import { LocalKeywordsTable, latestKeywordScan } from "./LocalKeywordsTable";
 import type { LocalSeoSearch } from "@/types/schemas/local-seo-search";
 
 type TrackerData = Awaited<ReturnType<typeof getLocalTracker>>;
+
+// The workflow runs a keyword's points in waves of six live searches, each
+// wave ~3-5 s, so a check takes about five seconds per wave.
+function checkDurationLabel(keywords: number, points: number) {
+  const seconds = keywords * Math.ceil(points / 6) * 5;
+  return seconds < 60
+    ? "under a minute"
+    : `about ${Math.ceil(seconds / 60)} minute${seconds > 60 ? "s" : ""}`;
+}
 
 export function LocalTrackerDetail({
   projectId,
@@ -63,6 +79,7 @@ function TrackerContent({
   const queryClient = useQueryClient();
   const [confirm, setConfirm] = useState<string | null>(null);
   const [managingKeywords, setManagingKeywords] = useState(false);
+  const [changingArea, setChangingArea] = useState(false);
   const keyword =
     keywords.find((row) => row.id === search.keyword) ?? keywords[0];
   const latestScan = keyword && latestKeywordScan(scans, keyword.id);
@@ -89,6 +106,9 @@ function TrackerContent({
     },
   });
   const active = checks.find((check) => isLocalScanActive(check.status));
+  const searchesDone = scans
+    .filter((scan) => scan.checkId === active?.id)
+    .reduce((total, scan) => total + (scan.summary?.completed ?? 0), 0);
   // Latest falls back to each keyword's newest results, so say when the map
   // shows an older check because the newest one returned none.
   const failed =
@@ -106,11 +126,19 @@ function TrackerContent({
             <h2 className="text-lg font-semibold">{tracker.title}</h2>
             <p className="text-xs text-muted-foreground">{tracker.address}</p>
             <p className="text-xs text-muted-foreground">
-              {tracker.gridSize}×{tracker.gridSize} grid · {tracker.spacingKm}{" "}
-              km spacing · Mobile · Manual checks
+              {localAreaLabel(tracker)} · Mobile
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={Boolean(active)}
+              onClick={() => setChangingArea(true)}
+            >
+              <Grid3x3 data-icon="inline-start" />
+              Change area
+            </Button>
             <Button
               size="sm"
               variant="outline"
@@ -131,6 +159,26 @@ function TrackerContent({
             </Button>
           </div>
         </div>
+        {active && (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border px-4 py-2 text-sm text-muted-foreground">
+            <Spinner className="size-3.5 text-primary" />
+            <span>
+              Checking {estimate.keywords} keyword
+              {estimate.keywords === 1 ? "" : "s"} across {estimate.points}{" "}
+              points · {searchesDone}/{estimate.searches} searches
+            </span>
+            <Progress
+              className="w-24"
+              aria-label="Ranking check progress"
+              value={searchesDone}
+              max={estimate.searches}
+            />
+            <span>
+              Usually takes{" "}
+              {checkDurationLabel(estimate.keywords, estimate.points)}
+            </span>
+          </div>
+        )}
         {failed && (
           <div className="px-4 pb-3">
             <QueryError
@@ -178,9 +226,7 @@ function TrackerContent({
             />
           )}
           <span className="text-sm text-muted-foreground">
-            {active
-              ? `Checking ${estimate.keywords} keyword${estimate.keywords === 1 ? "" : "s"} across ${estimate.points} points`
-              : `${keywords.length} keyword${keywords.length === 1 ? "" : "s"}`}
+            {keywords.length} keyword{keywords.length === 1 ? "" : "s"}
           </span>
           {history && (
             <span className="ml-auto text-xs text-muted-foreground">
@@ -213,6 +259,13 @@ function TrackerContent({
           onClose={() => setManagingKeywords(false)}
         />
       )}
+      {changingArea && (
+        <LocalAreaDialog
+          projectId={projectId}
+          tracker={tracker}
+          onClose={() => setChangingArea(false)}
+        />
+      )}
       {confirm && (
         <ConfirmDialog
           title={`Check ${estimate.keywords} keyword${estimate.keywords === 1 ? "" : "s"}?`}
@@ -223,7 +276,8 @@ function TrackerContent({
         >
           {estimate.keywords} keyword{estimate.keywords === 1 ? "" : "s"}{" "}
           &times; {estimate.points} grid points = {estimate.searches} Google
-          Maps searches on mobile. Costs up to{" "}
+          Maps searches on mobile, taking{" "}
+          {checkDurationLabel(estimate.keywords, estimate.points)}. Costs up to{" "}
           <span className="font-mono font-semibold text-foreground">
             {/* Credits are $0.001, so three decimals show the exact maximum. */}
             {estimate.costUsd.toLocaleString("en-US", {
