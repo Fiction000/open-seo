@@ -215,12 +215,27 @@ export async function snapshotWorker(api, worker) {
   return { deployments, versions, active };
 }
 
-async function verifyUploadSource(api, worker, sourceId, uploadedId) {
-  const { items } = await api("GET", worker, "versions");
-  assert(
-    items?.[0]?.id === uploadedId && items?.[1]?.id === sourceId,
-    `${worker}: upload lineage changed; review pending versions before activation`,
-  );
+// The versions list is eventually consistent: a read right after an upload
+// can omit the new version. Retry only that case; any other order (a foreign
+// version, a moved source) fails closed at once.
+const LINEAGE_RETRY_DELAYS_MS = [1000, 2000, 4000, 8000];
+
+async function verifyUploadSource(api, worker, sourceId, uploadedId, sleep) {
+  for (let attempt = 0; ; attempt++) {
+    const { items } = await api("GET", worker, "versions");
+    const stale =
+      items?.[0]?.id === sourceId &&
+      !items.some((item) => item?.id === uploadedId);
+    if (stale && attempt < LINEAGE_RETRY_DELAYS_MS.length) {
+      await sleep(LINEAGE_RETRY_DELAYS_MS[attempt]);
+      continue;
+    }
+    assert(
+      items?.[0]?.id === uploadedId && items?.[1]?.id === sourceId,
+      `${worker}: upload lineage changed; review pending versions before activation`,
+    );
+    return;
+  }
 }
 
 export async function guard({ env, exec, now }) {
@@ -248,6 +263,7 @@ export async function run({
   fetchImpl = fetch,
   exec = execFile,
   now = () => new Date(),
+  sleep = (ms) => new Promise((done) => setTimeout(done, ms)),
 } = {}) {
   assert(
     ["plan", "deploy"].includes(mode),
@@ -341,6 +357,7 @@ export async function run({
           worker,
           snapshots[worker].active.id,
           uploads[worker],
+          sleep,
         );
       }
     }
@@ -355,6 +372,7 @@ export async function run({
           target,
           snapshots[target].active.id,
           uploads[target],
+          sleep,
         );
         const current = await api("GET", target, "deployments");
         assert(
