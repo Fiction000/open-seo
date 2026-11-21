@@ -49,6 +49,29 @@ it("keeps routing restricted to the SAM lobby", () => {
   expect(router).toContain("onBeforeRequest:");
 });
 
+it("exports every Durable Object class that wrangler.jsonc binds", () => {
+  const server = readFileSync(
+    new URL("../../../server.ts", import.meta.url),
+    "utf8",
+  );
+  const config = readFileSync(
+    new URL("../../../../wrangler.jsonc", import.meta.url),
+    "utf8",
+  );
+  const doBlock = config.match(
+    /"durable_objects"\s*:\s*\{[\s\S]*?\n  \},/,
+  )?.[0];
+  const bound = [
+    ...(doBlock ?? "").matchAll(/"class_name"\s*:\s*"(\w+)"/g),
+  ].map((match) => match[1]);
+
+  expect(bound).toContain("OnboardingChatAgent");
+  for (const className of bound)
+    expect(server).toMatch(
+      new RegExp(`export\\s*\\{[^}]*\\b${className}\\b[^}]*\\}`),
+    );
+});
+
 it("retains the legacy binding and never schedules its class deletion", () => {
   const config = readFileSync(
     new URL("../../../../wrangler.jsonc", import.meta.url),
