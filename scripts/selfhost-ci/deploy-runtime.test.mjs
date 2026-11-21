@@ -221,6 +221,61 @@ test("full mocked deployment uploads both then activates audit/app with guards a
   ]);
 });
 
+function staleVersionReads(h, staleReads) {
+  let stale = 0;
+  return async (url, init) => {
+    const response = await h.fetchImpl(url, init);
+    const data = await response.json();
+    const items = data.result?.items;
+    if (
+      init.method === "GET" &&
+      new URL(url).pathname.endsWith(`/scripts/${WORKERS[0]}/versions`) &&
+      items?.[0]?.id === UPLOAD_IDS[0] &&
+      stale < staleReads
+    ) {
+      stale++;
+      data.result.items = items.slice(1);
+    }
+    return { ok: true, json: async () => data };
+  };
+}
+
+test("stale version list missing the fresh upload is retried, then activation proceeds", async () => {
+  const h = harness();
+  const waits = [];
+  assert.match(
+    await run({
+      mode: "deploy",
+      env,
+      now,
+      exec: h.exec,
+      fetchImpl: staleVersionReads(h, 2),
+      sleep: async (ms) => waits.push(ms),
+    }),
+    /read back successfully/,
+  );
+  assert.equal(waits.length, 2);
+  assert(h.events.includes("activate:1"));
+});
+
+test("persistently missing upload still fails closed after bounded retries", async () => {
+  const h = harness();
+  const waits = [];
+  await assert.rejects(
+    run({
+      mode: "deploy",
+      env,
+      now,
+      exec: h.exec,
+      fetchImpl: staleVersionReads(h, Infinity),
+      sleep: async (ms) => waits.push(ms),
+    }),
+    /lineage changed/,
+  );
+  assert(waits.length > 0 && waits.length <= 5);
+  assert(!h.events.includes("activate:0"));
+});
+
 test("manual deployment race prevents activation and failed readback prevents app activation", async () => {
   const race = harness({ changeActive: true });
   await assert.rejects(
