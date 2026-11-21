@@ -353,6 +353,9 @@ async function handleAppRequest(
 export { RankCheckWorkflow } from "./server/workflows/RankCheckWorkflow";
 export { AiVisibilityWorkflow } from "./server/workflows/AiVisibilityWorkflow";
 export { LocalRankWorkflow } from "./server/workflows/LocalRankWorkflow";
+// Storage-only compatibility class for the retired onboarding chat. Keep the
+// legacy class and binding so its namespace and stored conversations survive.
+export { OnboardingChatAgent } from "./server/features/onboarding/RetainedOnboardingChatAgent";
 // Durable Object class for the SAM in-app agent (Agents SDK).
 export { SamChatAgent } from "./server/features/sam/SamChatAgent";
 

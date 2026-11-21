@@ -61,3 +61,14 @@ it("retains the legacy binding and never schedules its class deletion", () => {
     /"deleted_classes"\s*:\s*\[[^\]]*OnboardingChatAgent/,
   );
 });
+
+it("exports the retained class from the worker entry so the live namespace stays bound", async () => {
+  const server = readFileSync(
+    new URL("../../../server.ts", import.meta.url),
+    "utf8",
+  );
+
+  expect(server).toMatch(
+    /export \{ OnboardingChatAgent \} from "\.\/server\/features\/onboarding\/RetainedOnboardingChatAgent";/,
+  );
+});
