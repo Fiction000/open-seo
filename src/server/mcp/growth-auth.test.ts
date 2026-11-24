@@ -37,7 +37,7 @@ const validConfig = {
 };
 
 describe("growth automation auth boundary", () => {
-  it("never allows a tool that saves, starts, schedules, tracks, or deletes", async () => {
+  it("allows only the 51 approved growth tools and denies destructive, sharing, scheduling, and tracking tools", async () => {
     const { GROWTH_MCP_ALLOWED_TOOLS } = await import("./growth-auth");
     const forbidden = [
       "update_project_context",
@@ -53,18 +53,23 @@ describe("growth automation auth boundary", () => {
       "create_gateway_rank_tracker",
       "run_rank_tracker",
       "add_rank_tracking_keywords",
-      "run_site_audit",
       "delete_site_audit",
-      "save_report",
       "delete_report",
       "set_report_sharing",
-      "save_keywords",
       "remove_saved_keywords",
       "set_search_console_site",
       "set_google_analytics_property",
       "submit_indexnow_urls",
       "get_local_rank_grid",
     ];
+    for (const name of [
+      "run_site_audit",
+      "get_audit_lighthouse",
+      "save_report",
+      "save_keywords",
+    ])
+      expect(GROWTH_MCP_ALLOWED_TOOLS as readonly string[]).toContain(name);
+    expect(GROWTH_MCP_ALLOWED_TOOLS).toHaveLength(51);
     for (const name of forbidden)
       expect(GROWTH_MCP_ALLOWED_TOOLS as readonly string[]).not.toContain(name);
     expect(new Set(GROWTH_MCP_ALLOWED_TOOLS).size).toBe(

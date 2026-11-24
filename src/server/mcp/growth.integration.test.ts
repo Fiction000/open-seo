@@ -83,6 +83,12 @@ beforeAll(async () => {
     CREATE TRIGGER no_user_write BEFORE INSERT ON user BEGIN SELECT RAISE(ABORT, 'user writes forbidden'); END;
     CREATE TRIGGER no_member_write BEFORE INSERT ON member BEGIN SELECT RAISE(ABORT, 'member writes forbidden'); END;
     CREATE TABLE report_templates (id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE, name TEXT NOT NULL, description TEXT NOT NULL, instructions TEXT NOT NULL, created_by TEXT NOT NULL, created_by_user_id TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+    CREATE TABLE reports (id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE, title TEXT NOT NULL, summary TEXT NOT NULL, html TEXT NOT NULL, skill TEXT, template_id TEXT, created_by TEXT NOT NULL, created_by_user_id TEXT NOT NULL, size_bytes INTEGER NOT NULL, share_token TEXT, shared_at TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+    CREATE TABLE saved_keywords (id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE, keyword TEXT NOT NULL, location_code INTEGER NOT NULL DEFAULT 2840, language_code TEXT NOT NULL DEFAULT 'en', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE(project_id, keyword, location_code, language_code));
+    CREATE TABLE saved_keyword_tags (id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE, name TEXT NOT NULL, normalized_name TEXT NOT NULL, color TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE(project_id, normalized_name));
+    CREATE TABLE saved_keyword_tag_assignments (saved_keyword_id TEXT NOT NULL REFERENCES saved_keywords(id) ON DELETE CASCADE, tag_id TEXT NOT NULL REFERENCES saved_keyword_tags(id) ON DELETE CASCADE, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE(saved_keyword_id, tag_id));
+    CREATE TABLE keyword_metrics (id INTEGER PRIMARY KEY AUTOINCREMENT, project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE, keyword TEXT NOT NULL, location_code INTEGER NOT NULL, language_code TEXT NOT NULL DEFAULT 'en', search_volume INTEGER, cpc REAL, competition REAL, keyword_difficulty INTEGER, intent TEXT, monthly_searches TEXT, fetched_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE(project_id, keyword, location_code, language_code));
+    CREATE TABLE rank_tracking_configs (id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE, domain TEXT NOT NULL, location_code INTEGER NOT NULL DEFAULT 2840, language_code TEXT NOT NULL DEFAULT 'en', devices TEXT NOT NULL DEFAULT 'both', serp_depth INTEGER NOT NULL DEFAULT 10, schedule_interval TEXT NOT NULL DEFAULT 'weekly', location_name TEXT, is_active INTEGER NOT NULL DEFAULT 1, last_checked_at TEXT, next_check_at TEXT, last_skip_reason TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
     ${contextMigration}`);
   const pair = await generateKeyPair("RS256");
   privateKey = pair.privateKey;
@@ -217,6 +223,10 @@ describe("growth MCP HTTP and SQLite acceptance", () => {
     const listed = listing.result?.tools?.map((tool) => tool.name) ?? [];
     expect(new Set(listed)).toEqual(new Set(GROWTH_MCP_ALLOWED_TOOLS));
     expect(listed).toHaveLength(GROWTH_MCP_ALLOWED_TOOLS.length);
+    expect(listed).toContain("run_site_audit");
+    expect(listed).toContain("get_audit_lighthouse");
+    expect(listed).toContain("save_report");
+    expect(listed).toContain("save_keywords");
     expect(
       (await result(await call("whoami"))).result?.structuredContent,
     ).toMatchObject({ creditsRemaining: null });
@@ -229,6 +239,114 @@ describe("growth MCP HTTP and SQLite acceptance", () => {
     expect(JSON.stringify(projects)).not.toContain(
       "123e4567-e89b-42d3-a456-426614174003",
     );
+  });
+  it("saves and reads project reports and clustered keywords only within configured projects", async () => {
+    const savedReport = await result(
+      await call("save_report", {
+        projectId: projectIds[0],
+        title: "Growth report — 2026-11-25",
+        summary: "A concise report summary.",
+        html: "<!doctype html><html><head><title>Growth report — 2026-11-25</title></head><body><h1>Growth report — 2026-11-25</h1></body></html>",
+        skill: "seo-audit",
+      }),
+    );
+    expect(savedReport.result?.isError).not.toBe(true);
+    const reports = await result(
+      await call("list_reports", { projectId: projectIds[0] }),
+    );
+    expect(JSON.stringify(reports)).toContain("Growth report — 2026-11-25");
+    const reportId = savedReport.result?.structuredContent?.reportId;
+    expect(reportId).toBeTypeOf("string");
+    const attribution = await client.execute({
+      sql: "SELECT created_by_user_id FROM reports WHERE id = ?",
+      args: [String(reportId)],
+    });
+    expect(attribution.rows[0]?.created_by_user_id).toBe(
+      "service:openseo-growth-automation",
+    );
+    const report = await result(
+      await call("get_report", {
+        projectId: projectIds[0],
+        reportId,
+        includeHtml: true,
+      }),
+    );
+    expect(JSON.stringify(report)).toContain("<h1>Growth report");
+
+    const savedKeywords = await result(
+      await call("save_keywords", {
+        projectId: projectIds[0],
+        keywords: ["growth integration keyword"],
+        tags: ["integration cluster"],
+      }),
+    );
+    expect(
+      savedKeywords.result?.isError,
+      JSON.stringify(savedKeywords),
+    ).not.toBe(true);
+    const keywords = await result(
+      await call("list_saved_keywords", { projectId: projectIds[0] }),
+    );
+    expect(JSON.stringify(keywords)).toContain("growth integration keyword");
+    expect(JSON.stringify(keywords)).toContain("integration cluster");
+
+    for (const name of ["save_report", "save_keywords"]) {
+      const outside = await result(
+        await call(name, {
+          projectId: "123e4567-e89b-42d3-a456-426614174002",
+          ...(name === "save_report"
+            ? {
+                title: "Outside",
+                summary: "Summary",
+                html: "<html><body><h1>Outside</h1></body></html>",
+              }
+            : { keywords: ["outside keyword"] }),
+        }),
+      );
+      expect(outside.result?.isError).toBe(true);
+      const foreign = await result(
+        await call(name, {
+          projectId: "123e4567-e89b-42d3-a456-426614174003",
+          ...(name === "save_report"
+            ? {
+                title: "Foreign",
+                summary: "Summary",
+                html: "<html><body><h1>Foreign</h1></body></html>",
+              }
+            : { keywords: ["foreign keyword"] }),
+        }),
+      );
+      expect(foreign.result?.isError).toBe(true);
+    }
+  });
+  it("rejects audit starts and Lighthouse reads for unconfigured projects", async () => {
+    for (const [name, args] of [
+      [
+        "run_site_audit",
+        {
+          projectId: "123e4567-e89b-42d3-a456-426614174002",
+          url: "https://example.com",
+        },
+      ],
+      [
+        "get_audit_lighthouse",
+        { projectId: "123e4567-e89b-42d3-a456-426614174002" },
+      ],
+      [
+        "run_site_audit",
+        {
+          projectId: "123e4567-e89b-42d3-a456-426614174003",
+          url: "https://example.com",
+        },
+      ],
+      [
+        "get_audit_lighthouse",
+        { projectId: "123e4567-e89b-42d3-a456-426614174003" },
+      ],
+    ] as const) {
+      const denied = await result(await call(name, args));
+      expect(denied.result?.isError).toBe(true);
+    }
   });
   it("denies every write, job-start, tracking, and deletion tool and every unconfigured project, without changing data", async () => {
     const snapshotSql =
@@ -244,10 +362,10 @@ describe("growth MCP HTTP and SQLite acceptance", () => {
       "create_rank_tracker",
       "create_gateway_rank_tracker",
       "run_rank_tracker",
-      "run_site_audit",
+      "delete_site_audit",
       "delete_report",
-      "save_report",
-      "save_keywords",
+      "set_report_sharing",
+      "remove_saved_keywords",
       "set_google_analytics_property",
       "set_search_console_site",
     ]) {
