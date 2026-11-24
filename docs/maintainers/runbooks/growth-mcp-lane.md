@@ -1,4 +1,4 @@
-# OpenSEO growth lane (`/mcp/growth`): read-only MCP for `head-of-growth`
+# OpenSEO growth lane (`/mcp/growth`): bounded growth MCP lane
 
 Status: code only, default OFF. Nothing in this PR enables it.
 Date: 2026-11-03. Owner of rollout: Nouska (integration). Approver: Tatsu.
@@ -7,15 +7,15 @@ Date: 2026-11-03. Owner of rollout: Nouska (integration). Approver: Tatsu.
 
 - A third MCP principal, `growth-automation`, on its own route `https://seo.katot.dev/mcp/growth` (POST only, exact host/path, checked before auth).
 - Its own Cloudflare Access app and service token. The shared `/mcp` app and its policy, and the `/mcp/personal` app, are not touched.
-- A fixed server-side allowlist of 47 tools, enforced twice: at `tools/list` registration and again at `tools/call` before dispatch. The shared 16-name machine allowlist (live LiteLLM allowed_tools: 14) is unchanged and asserted by a test.
+- A fixed server-side allowlist of 51 tools, enforced twice: at `tools/list` registration and again at `tools/call` before dispatch. The shared 16-name machine allowlist (live LiteLLM allowed_tools: 14) is unchanged and asserted by a test.
 - Project scope: only the project UUIDs in `MCP_GROWTH_PROJECT_IDS` (1 to 10). Other project IDs are refused before any service read.
 - Audience and client collisions with `POLICY_AUD`, `MCP_GATEWAY_*`, and `MCP_PERSONAL_*` fail closed.
 
 ## Tiers (summary; full table in the Agent Vault note)
 
-- T0 free read-only: whoami, list_projects, get_project_context, list_saved_keywords, search_serp_locations, get_dataforseo_balance, 12 Search Console/GA4 tools, list_site_audits, get_audit_status, get_audit_issues, get_audit_pages, list_reports, get_report, list_report_templates, get_rank_tracker, estimate_rank_tracker_cost, estimate_ai_visibility_cost, get_ai_visibility_tracker/run/results/answer/sources/trend, export_ai_visibility_data.
+- T0 free reads and bounded project writes: whoami, list_projects, get_project_context, list_saved_keywords, search_serp_locations, get_dataforseo_balance, 12 Search Console/GA4 tools, list_site_audits, get_audit_status, get_audit_issues, get_audit_pages, get_audit_lighthouse, list_reports, get_report, save_report, list_report_templates, save_keywords, run_site_audit (bounded; Lighthouse off by default), get_rank_tracker, estimate_rank_tracker_cost, estimate_ai_visibility_cost, get_ai_visibility_tracker/run/results/answer/sources/trend, export_ai_visibility_data.
 - T1 paid reads that save nothing (estimate-first by convention, see below): research_keywords, get_keyword_metrics, get_domain_overview, get_domain_keyword_suggestions, get_domain_history, get_ranked_keywords, find_serp_competitors, get_serp_results, get_backlinks_overview, get_backlinks_profile, research_ai_visibility_prompts, generate_ai_visibility_prompts.
-- T2 NOT exposed: everything that saves, starts a job, schedules, tracks, publishes, or deletes (see "Per-run grants").
+- T2 NOT exposed: deletion, public report sharing, scheduling, rank-tracker mutations, project/context mutations, and AI visibility runs. `save_report` and `save_keywords` are project-scoped writes; `run_site_audit` is bounded and Lighthouse remains off by default.
 
 Spend control. Only `run_ai_visibility_check` has a server-side cap (`maxCostUsd`), and it is T2. The T1 tools charge per call with no server-side cap, so the caller must read the cost in the tool description, call `get_dataforseo_balance` before and after, and report spend. The lane's MCP `instructions` tell the agent this.
 
@@ -32,9 +32,9 @@ Spend control. Only `run_ai_visibility_check` has a server-side cap (`maxCostUsd
 4. Create the LiteLLM MCP server (admin API, `./up` only if a restart is needed):
    - `server_name: openseo_growth`, `url: https://seo.katot.dev/mcp/growth`, `transport: http`
    - `allow_all_keys: false`, `available_on_public_internet: false`
-   - `allowed_tools`: exactly the 47 names below
+   - `allowed_tools`: exactly the 51 names below
    - Access headers for the new token as extra headers (same mechanism as `openseo_personal`)
-5. Create a NEW LiteLLM virtual key for `head-of-growth` only (alias `head-of-growth`), with `object_permission.mcp_servers=["openseo_growth"]` and `mcp_tool_permissions.openseo_growth=<same 47 names>`. Set a `max_budget`/`rpm_limit` only if Tatsu asks (the task said: do not change LiteLLM limits). Do not add this server to the main Hermes key. Put the key in `/Users/kawana/.hermes/profiles/head-of-growth/.env` as `MCP_LITELLM_GROWTH_KEY` through 1Password; never in chat.
+5. Create a NEW LiteLLM virtual key for `head-of-growth` only (alias `head-of-growth`), with `object_permission.mcp_servers=["openseo_growth"]` and `mcp_tool_permissions.openseo_growth=<same 51 names>`. Set a `max_budget`/`rpm_limit` only if Tatsu asks (the task said: do not change LiteLLM limits). Do not add this server to the main Hermes key. Put the key in `/Users/kawana/.hermes/profiles/head-of-growth/.env` as `MCP_LITELLM_GROWTH_KEY` through 1Password; never in chat.
 6. Add this to `/Users/kawana/.hermes/profiles/head-of-growth/config.yaml` (not edited by this PR):
 
 ```yaml
@@ -93,13 +93,17 @@ mcp_servers:
         - openseo_growth-get_backlinks_profile
         - openseo_growth-research_ai_visibility_prompts
         - openseo_growth-generate_ai_visibility_prompts
+        - openseo_growth-get_audit_lighthouse
+        - openseo_growth-run_site_audit
+        - openseo_growth-save_report
+        - openseo_growth-save_keywords
 ```
 
 Note: LiteLLM prefixes tool names with the server name, so `include` uses `openseo_growth-<tool>`. The `mcp_servers` block in the main profile is not changed.
 
 7. Readback checks (read-only):
-   - Direct Worker with the new Access token: `initialize` + `tools/list` returns exactly the 47 names; `tools/call update_project_context` returns "Tool not allowed"/unknown tool.
-   - LiteLLM with the head-of-growth key: `tools/list` on `/mcp/openseo_growth` returns the same 47 names with the `openseo_growth-` prefix. Send `Accept: application/json, text/event-stream`; with `application/json` only, LiteLLM answers 406 (that is the "MCP error" seen on 2026-11-03, not an outage).
+   - Direct Worker with the new Access token: `initialize` + `tools/list` returns exactly the 51 names; `tools/call update_project_context` returns "Tool not allowed"/unknown tool.
+   - LiteLLM with the head-of-growth key: `tools/list` on `/mcp/openseo_growth` returns the same 51 names with the `openseo_growth-` prefix. Send `Accept: application/json, text/event-stream`; with `application/json` only, LiteLLM answers 406 (that is the "MCP error" seen on 2026-11-03, not an outage).
    - The main Hermes key, `tools/list` on `/mcp`: no `openseo_growth-*` tools. The main key calling `/mcp/openseo_growth` is refused.
    - `whoami` returns `creditsRemaining:null`; `list_projects` returns only the configured UUIDs.
    - `get_dataforseo_balance` returns a USD number (free).
@@ -114,7 +118,7 @@ To measure mention/citation rate on a fixed prompt set, Tatsu approves each run,
 3. `run_ai_visibility_check` with `maxCostUsd` = the approved `runNowCostUsd` (paid, capped).
 4. Reads: `get_ai_visibility_run` (poll), `get_ai_visibility_results`, `_answer`, `_sources`, `_trend`, `export_ai_visibility_data` (already allowed).
 
-Never grant without a separate approval: `set_ai_visibility_schedule` (recurring spend), `complete_ai_research_setup`, `explore_prompt`, `run_site_audit`, `create_rank_tracker`/`run_rank_tracker`, `save_report`, any `delete_*`/`remove_*`, `update_project_context`, `save_project_website_setup`, `research_project_website`.
+Never grant without a separate approval: `set_ai_visibility_schedule` (recurring spend), `complete_ai_research_setup`, `explore_prompt`, `create_rank_tracker`/`run_rank_tracker`, `set_report_sharing`, any `delete_*`/`remove_*`, `update_project_context`, `save_project_website_setup`, `research_project_website`.
 
 ## Rollback
 
@@ -123,6 +127,6 @@ Never grant without a separate approval: `set_ai_visibility_schedule` (recurring
 3. Disable the Access app (or delete the policy) and revoke the growth service token.
 4. Set `MCP_GROWTH_ENABLED=false` (or empty the vars) and redeploy, or revert this PR. No schema or migration is involved, so there is nothing to roll back in the database.
 
-## Allowed tool names (47)
+## Allowed tool names (51)
 
-whoami, list_projects, get_project_context, list_saved_keywords, search_serp_locations, get_dataforseo_balance, get_search_console_performance, inspect_urls, get_google_analytics_organic_landing_pages, get_google_analytics_page_performance, get_google_analytics_key_events, get_search_opportunities, get_google_analytics_organic_overview, get_google_analytics_traffic_acquisition, get_google_analytics_ecommerce_performance, get_google_analytics_site_search, get_google_analytics_audience_breakdown, get_google_analytics_measurement_health, list_site_audits, get_audit_status, get_audit_issues, get_audit_pages, list_reports, get_report, list_report_templates, get_rank_tracker, estimate_rank_tracker_cost, estimate_ai_visibility_cost, get_ai_visibility_tracker, get_ai_visibility_run, get_ai_visibility_results, get_ai_visibility_answer, get_ai_visibility_sources, get_ai_visibility_trend, export_ai_visibility_data, research_keywords, get_keyword_metrics, get_domain_overview, get_domain_keyword_suggestions, get_domain_history, get_ranked_keywords, find_serp_competitors, get_serp_results, get_backlinks_overview, get_backlinks_profile, research_ai_visibility_prompts, generate_ai_visibility_prompts
+whoami, list_projects, get_project_context, list_saved_keywords, search_serp_locations, get_dataforseo_balance, get_search_console_performance, inspect_urls, get_google_analytics_organic_landing_pages, get_google_analytics_page_performance, get_google_analytics_key_events, get_search_opportunities, get_google_analytics_organic_overview, get_google_analytics_traffic_acquisition, get_google_analytics_ecommerce_performance, get_google_analytics_site_search, get_google_analytics_audience_breakdown, get_google_analytics_measurement_health, list_site_audits, get_audit_status, get_audit_issues, get_audit_pages, get_audit_lighthouse, run_site_audit, list_reports, get_report, save_report, list_report_templates, save_keywords, get_rank_tracker, estimate_rank_tracker_cost, estimate_ai_visibility_cost, get_ai_visibility_tracker, get_ai_visibility_run, get_ai_visibility_results, get_ai_visibility_answer, get_ai_visibility_sources, get_ai_visibility_trend, export_ai_visibility_data, research_keywords, get_keyword_metrics, get_domain_overview, get_domain_keyword_suggestions, get_domain_history, get_ranked_keywords, find_serp_competitors, get_serp_results, get_backlinks_overview, get_backlinks_profile, research_ai_visibility_prompts, generate_ai_visibility_prompts

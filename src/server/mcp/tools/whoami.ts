@@ -121,6 +121,6 @@ export const growthWhoamiTool = {
   config: {
     ...personalWhoamiTool.config,
     description:
-      "Identifies this self-hosted read-only growth automation principal. Does not query or initialize billing.",
+      "Identifies this self-hosted growth automation principal. Does not query or initialize billing.",
   },
 };
